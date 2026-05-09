@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ram Browser icon: shield with lock representing privacy -->
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6d28d9"/>
+      <stop offset="100%" style="stop-color:#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:0.4"/>
+      <stop offset="100%" style="stop-color:#4c1d95;stop-opacity:0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="256" fill="url(#shine)"/>
+
+  <!-- Shield body -->
+  <path d="M256 80 L380 130 L380 260 Q380 360 256 430 Q132 360 132 260 L132 130 Z"
+        fill="#1e1b4b" opacity="0.9"/>
+
+  <!-- Shield highlight -->
+  <path d="M256 95 L365 140 L365 260 Q365 350 256 415 Q147 350 147 260 L147 140 Z"
+        fill="none" stroke="#7c3aed" stroke-width="4" opacity="0.6"/>
+
+  <!-- Lock body -->
+  <rect x="208" y="250" width="96" height="76" rx="10" ry="10" fill="#7c3aed"/>
+
+  <!-- Lock shackle -->
+  <path d="M228 250 L228 228 Q228 200 256 200 Q284 200 284 228 L284 250"
+        fill="none" stroke="#7c3aed" stroke-width="18" stroke-linecap="round"/>
+
+  <!-- Lock keyhole -->
+  <circle cx="256" cy="285" r="10" fill="#1e1b4b"/>
+  <rect x="250" y="285" width="12" height="20" rx="3" fill="#1e1b4b"/>
+</svg>

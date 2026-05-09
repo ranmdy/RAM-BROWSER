@@ -1,0 +1,79 @@
+appId: com.rambrowser.app
+productName: Ram Browser
+copyright: "Copyright © 2026 Ram Browser"
+
+# Include only the files that ship in the package
+files:
+  - src/**/*
+  - phantom-browser-ui.html
+  - "!src/**/*.test.js"
+  - "!test/**"
+  - "!scripts/**"
+
+# Bundle into an asar archive, unpack native binaries + WARP
+asar: true
+asarUnpack:
+  - "resources/warp/**"
+  - "node_modules/**/*.node"
+
+# Output directory
+directories:
+  output: dist
+  buildResources: build
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.utilities
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  icon: build/icon.icns
+
+dmg:
+  title: "Ram Browser ${version}"
+  background: build/dmg-background.png
+  window:
+    width: 660
+    height: 440
+  contents:
+    - x: 180
+      y: 220
+    - x: 480
+      y: 220
+      type: link
+      path: /Applications
+
+# ── Windows ───────────────────────────────────────────────────────────────────
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  license: build/license.txt
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  category: Network
+  icon: build/icons
+
+# ── Auto-updater (GitHub Releases) ────────────────────────────────────────────
+publish:
+  provider: github
+  owner: rambrowser
+  repo: ram-browser
+  private: true

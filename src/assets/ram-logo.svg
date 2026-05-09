@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    
+    <linearGradient id="tileBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a3a3f"></stop>
+      <stop offset="100%" stop-color="#1a1a1c"></stop>
+    </linearGradient>
+    
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"></stop>
+      <stop offset="35%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"></stop>
+    </linearGradient>
+    
+    <radialGradient id="rim" cx="0.5" cy="0.5" r="0.7">
+      <stop offset="70%" stop-color="#ffffff" stop-opacity="0"></stop>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.08"></stop>
+    </radialGradient>
+    
+    <linearGradient id="hornG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3f3f4"></stop>
+      <stop offset="55%" stop-color="#b8b8be"></stop>
+      <stop offset="100%" stop-color="#5e5e64"></stop>
+    </linearGradient>
+    
+    <linearGradient id="wool" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8e8eb"></stop>
+      <stop offset="100%" stop-color="#9a9aa0"></stop>
+    </linearGradient>
+    
+    <linearGradient id="snoutG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c9c9ce"></stop>
+      <stop offset="100%" stop-color="#76767c"></stop>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="0.5"></feGaussianBlur>
+    </filter>
+  </defs>
+
+  
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#tileBody)"></rect>
+  <rect x="16" y="16" width="224" height="224" rx="56" fill="url(#rim)"></rect>
+
+  
+  <g transform="translate(128 138)">
+    
+    <g fill="none" stroke="url(#hornG)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+      
+      <path d="M -28 -38&#xA;               C -56 -36, -82 -22, -82 4&#xA;               C -82 28, -64 38, -46 32&#xA;               C -32 27, -26 14, -34 4"></path>
+      
+      <path d="M -52 -14 C -68 -6, -68 14, -56 20" stroke-width="3" opacity="0.55"></path>
+
+      
+      <path d="M 28 -38&#xA;               C 56 -36, 82 -22, 82 4&#xA;               C 82 28, 64 38, 46 32&#xA;               C 32 27, 26 14, 34 4"></path>
+      <path d="M 52 -14 C 68 -6, 68 14, 56 20" stroke-width="3" opacity="0.55"></path>
+    </g>
+
+    
+    <path d="M -32 -42&#xA;             C -32 -62, -18 -72, 0 -72&#xA;             C 18 -72, 32 -62, 32 -42&#xA;             L 32 6&#xA;             C 32 18, 24 26, 14 28&#xA;             L -14 28&#xA;             C -24 26, -32 18, -32 6 Z" fill="url(#wool)"></path>
+
+    
+    <path d="M -16 -64&#xA;             C -10 -74, -4 -76, 0 -70&#xA;             C 4 -76, 10 -74, 16 -64&#xA;             C 12 -58, -12 -58, -16 -64 Z" fill="#f3f3f4"></path>
+    
+    <circle cx="-22" cy="-8" r="5" fill="#f0f0f3" opacity="0.7"></circle>
+    <circle cx="22" cy="-8" r="5" fill="#f0f0f3" opacity="0.7"></circle>
+
+    
+    <path d="M -36 -28 C -46 -24, -50 -14, -42 -8 Z" fill="url(#snoutG)"></path>
+    <path d="M  36 -28 C  46 -24,  50 -14,  42 -8 Z" fill="url(#snoutG)"></path>
+
+    
+    <path d="M -16 18&#xA;             C -16 36, 16 36, 16 18&#xA;             L 14 36&#xA;             C 14 46, -14 46, -14 36 Z" fill="url(#snoutG)"></path>
+
+    
+    <ellipse cx="-12" cy="-14" rx="3.4" ry="4.2" fill="#0e0e10"></ellipse>
+    <ellipse cx=" 12" cy="-14" rx="3.4" ry="4.2" fill="#0e0e10"></ellipse>
+    
+    <circle cx="-11" cy="-15.5" r="0.9" fill="#ffffff"></circle>
+    <circle cx=" 13" cy="-15.5" r="0.9" fill="#ffffff"></circle>
+
+    
+    <ellipse cx="-5" cy="30" rx="1.6" ry="2.2" fill="#0e0e10"></ellipse>
+    <ellipse cx=" 5" cy="30" rx="1.6" ry="2.2" fill="#0e0e10"></ellipse>
+    
+    <path d="M -4 38 Q 0 41 4 38" stroke="#0e0e10" stroke-width="1.4" fill="none" stroke-linecap="round"></path>
+  </g>
+
+  
+  <path d="M 16 72 Q 16 16 72 16 L 200 16 Q 240 16 240 56 L 240 96&#xA;           C 200 86, 60 86, 16 96 Z" fill="url(#sheen)"></path>
+
+  
+  <rect x="16.5" y="16.5" width="223" height="223" rx="55.5" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1"></rect>
+  
+  <rect x="15.5" y="15.5" width="225" height="225" rx="56.5" fill="none" stroke="#000000" stroke-opacity="0.6" stroke-width="1"></rect>
+</svg>

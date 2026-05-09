@@ -1,0 +1,3289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ram Browser</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   DESIGN SYSTEM — macOS 26 Tahoe Liquid Glass
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Dark palette (default) */
+  --glass:        rgba(28, 28, 30, 0.82);
+  --glass-hi:     rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --bg:           #1c1c1e;
+  --surface:      rgba(44, 44, 46, 0.90);
+  --surface-2:    rgba(58, 58, 60, 0.82);
+  --hover:        rgba(255, 255, 255, 0.07);
+  --text:         #f5f5f7;
+  --text-2:       rgba(245, 245, 247, 0.68);
+  --text-3:       rgba(245, 245, 247, 0.40);
+
+  /* Brand — ash neutral (no chromatic accent) */
+  --accent:       #b8b8be;
+  --accent-deep:  #6e6e74;
+  --accent-s:     rgba(184, 184, 190, 0.18);
+  --ash-50:       #f3f3f4;
+  --ash-100:      #d8d8dc;
+  --ash-200:      #b8b8be;
+  --ash-300:      #8e8e94;
+  --ash-400:      #6e6e74;
+  --ash-500:      #4a4a4f;
+  --ash-600:      #2e2e32;
+
+  --green:        #30d158;
+  --yellow:       #ffd60a;
+  --red:          #ff453a;
+  --blue:         #0a84ff;
+
+  /* Container colors */
+  --c-default:    #8e8e93;
+  --c-work:       #0a84ff;
+  --c-social:     #30d158;
+  --c-finance:    #ff453a;
+  --c-research:   #ffd60a;
+
+  --font:  -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+  --mono:  "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+
+  /* Radii */
+  --r-sm:   6px;
+  --r-md:   10px;
+  --r-lg:   14px;
+  --r-xl:   20px;
+  --r-full: 9999px;
+
+  /* Motion */
+  --ease:   cubic-bezier(0.16, 1, 0.3, 1);
+  --d-fast: 130ms;
+  --d-base: 180ms;
+  --d-slow: 240ms;
+
+  /* Elevation */
+  --shadow:    0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.08);
+  --shadow-sm: 0 8px 24px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.07);
+
+  /* Spacing (4-base) */
+  --s-1:  4px;  --s-2:  8px;  --s-3:  12px; --s-4:  16px;
+  --s-5:  20px; --s-6:  24px; --s-7:  28px; --s-8:  32px;
+  --s-10: 40px; --s-12: 48px;
+
+  /* Type scale */
+  --t-10: 10px; --t-11: 11px; --t-12: 12px; --t-13: 13px;
+  --t-15: 15px; --t-18: 18px; --t-20: 20px; --t-22: 22px; --t-32: 32px;
+
+  /* Line heights */
+  --lh-tight: 1.25; --lh-body: 1.5; --lh-lax: 1.6;
+
+  /* Letter spacing */
+  --ls-kicker:  0.06em;
+  --ls-eyebrow: 0.08em;
+  --ls-tight:   -0.005em;
+
+  /* Weights */
+  --w-regular:  400; --w-medium:   500; --w-semibold: 600;
+  --w-bold:     700; --w-heavy:    750;
+
+  /* ── Liquid Glass primitives (Apple Tahoe style) ─────────────
+     Heavy backdrop-blur + saturation boost, top specular sheen,
+     inner rim highlights, refraction tint.                      */
+  --blur-chrome:   blur(28px) saturate(180%);
+  --blur-popover:  blur(36px) saturate(200%);
+  --blur-overlay:  blur(48px) saturate(170%);
+  --blur-lock:     blur(60px);
+
+  /* Glass surface fills (translucent) */
+  --glass-1:  rgba(28, 28, 30, 0.55);   /* toolbars over content */
+  --glass-2:  rgba(28, 28, 30, 0.72);   /* popovers / panels */
+  --glass-3:  rgba(28, 28, 30, 0.86);   /* modals / lock */
+
+  /* Specular top sheen */
+  --sheen-top:    linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.04) 28%, rgba(255,255,255,0) 60%);
+  --sheen-strong: linear-gradient(180deg, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.06) 35%, rgba(255,255,255,0) 70%);
+
+  /* Inner / outer hairline strokes for "etched glass" */
+  --rim-light: inset 0 1px 0 rgba(255,255,255,0.14);
+  --rim-dark:  inset 0 -1px 0 rgba(0,0,0,0.35);
+  --rim-edge:  inset 0 0 0 1px rgba(255,255,255,0.06);
+
+  /* Ambient refraction colour cast */
+  --refract:   linear-gradient(135deg, rgba(255,255,255,0.04), rgba(0,0,0,0) 60%);
+
+  /* Fixed chrome heights */
+  --h-toolbar:   38px;
+  --h-tabbar:    36px;
+  --h-statusbar: 24px;
+  --h-tab:       28px;
+  --h-urlcap:    26px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --glass:        rgba(255, 255, 255, 0.78);
+    --glass-hi:     rgba(255, 255, 255, 0.55);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --bg:           #f2f2f7;
+    --surface:      rgba(255, 255, 255, 0.90);
+    --surface-2:    rgba(240, 240, 245, 0.90);
+    --hover:        rgba(0, 0, 0, 0.05);
+    --text:         #1c1c1e;
+    --text-2:       rgba(28, 28, 30, 0.65);
+    --text-3:       rgba(28, 28, 30, 0.38);
+    --accent:       #b8b8be;
+    --accent-s:     rgba(184, 184, 190, 0.18);
+    --shadow:    0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.06);
+    --shadow-sm: 0 8px 24px rgba(0,0,0,0.10), 0 0 0 1px rgba(0,0,0,0.05);
+    --glass-1:  rgba(255, 255, 255, 0.58);
+    --glass-2:  rgba(255, 255, 255, 0.75);
+    --glass-3:  rgba(255, 255, 255, 0.88);
+    --sheen-top: linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 28%, rgba(255,255,255,0) 60%);
+    --rim-light: inset 0 1px 0 rgba(255,255,255,0.70);
+  }
+}
+
+/* ── Reset ────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+button { font: inherit; border: 0; cursor: pointer; background: transparent; color: inherit; }
+input, textarea, [contenteditable] { font: inherit; user-select: text; }
+select { font: inherit; }
+
+/* ── App shell ────────────────────────────────────────────────── */
+.app      { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+.viewport { flex: 1; display: flex; min-height: 0; position: relative; overflow: hidden; }
+.content  { flex: 1; position: relative; overflow: hidden; }
+
+/* ── SVG icon sizes ───────────────────────────────────────────── */
+.svg-icon    { width: 16px; height: 16px; stroke-width: 1.7; }
+.svg-icon-sm { width: 14px; height: 14px; stroke-width: 1.8; }
+
+/* ══════════════════════════════════════════════════════════════
+   LIQUID GLASS utility classes
+   Stack: blur + translucent fill + refraction tint + specular
+          sheen + inner rim highlights.
+   ══════════════════════════════════════════════════════════════ */
+.glass {
+  position: relative;
+  background-color: var(--glass-1);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  box-shadow: var(--rim-light), var(--rim-edge);
+  border: 1px solid var(--glass-border);
+}
+.glass::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none; border-radius: inherit;
+  background: var(--sheen-top);
+  mix-blend-mode: screen; opacity: 0.9;
+}
+.glass-popover {
+  position: relative;
+  background-color: var(--glass-2);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-popover);
+  -webkit-backdrop-filter: var(--blur-popover);
+  box-shadow: var(--shadow), var(--rim-light);
+  border: 1px solid var(--glass-border);
+}
+.glass-popover::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none; border-radius: inherit;
+  background: var(--sheen-top);
+  mix-blend-mode: screen;
+}
+.glass-modal {
+  background-color: var(--glass-3);
+  backdrop-filter: var(--blur-overlay);
+  -webkit-backdrop-filter: var(--blur-overlay);
+  box-shadow: var(--shadow), var(--rim-light);
+  border: 1px solid var(--glass-border);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SEMANTIC TYPOGRAPHY
+   ══════════════════════════════════════════════════════════════ */
+.t-display  { font-family: var(--font); font-size: var(--t-32); font-weight: var(--w-bold); line-height: var(--lh-tight); letter-spacing: var(--ls-tight); color: var(--text); }
+.t-h1       { font-family: var(--font); font-size: var(--t-22); font-weight: var(--w-bold); line-height: var(--lh-tight); color: var(--text); }
+.t-h2       { font-family: var(--font); font-size: var(--t-20); font-weight: var(--w-bold); line-height: 1.3; color: var(--text); }
+.t-h3       { font-family: var(--font); font-size: var(--t-15); font-weight: var(--w-semibold); line-height: 1.35; color: var(--text); }
+.t-body     { font-family: var(--font); font-size: var(--t-13); font-weight: var(--w-regular); line-height: var(--lh-body); color: var(--text); }
+.t-body-2   { font-family: var(--font); font-size: var(--t-13); font-weight: var(--w-regular); line-height: var(--lh-body); color: var(--text-2); }
+.t-secondary{ font-family: var(--font); font-size: var(--t-12); font-weight: var(--w-regular); line-height: 1.4; color: var(--text-2); }
+.t-caption  { font-family: var(--font); font-size: var(--t-11); font-weight: var(--w-regular); line-height: 1.4; color: var(--text-3); }
+.t-kicker   { font-family: var(--font); font-size: var(--t-11); font-weight: var(--w-heavy); text-transform: uppercase; letter-spacing: var(--ls-eyebrow); color: var(--accent); }
+.t-eyebrow  { font-family: var(--font); font-size: var(--t-10); font-weight: var(--w-heavy); text-transform: uppercase; letter-spacing: var(--ls-eyebrow); color: var(--text-3); }
+.t-mono     { font-family: var(--mono); font-size: var(--t-10); font-weight: var(--w-regular); color: var(--text-3); }
+.t-mono-readout { font-family: var(--mono); font-size: var(--t-12); font-weight: var(--w-medium); color: var(--text); font-feature-settings: "tnum"; }
+.t-button   { font-family: var(--font); font-size: var(--t-12); font-weight: var(--w-medium); }
+
+/* ══════════════════════════════════════════════════════════════
+   TOOLBAR  (single 38px glass bar — Safari proportions)
+   ══════════════════════════════════════════════════════════════ */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 38px;
+  padding: 0 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 40;
+  background-color: var(--glass-1);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--rim-light);
+  -webkit-app-region: drag;
+}
+.toolbar::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: var(--sheen-top);
+  mix-blend-mode: screen;
+  z-index: 1;
+}
+.toolbar > * { -webkit-app-region: no-drag; }
+
+/* Traffic lights */
+.traffic-lights { display: flex; gap: 8px; margin-right: 4px; flex-shrink: 0; }
+.tl-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  cursor: pointer; flex-shrink: 0;
+  transition: filter 0.15s;
+}
+.tl-dot:hover { filter: brightness(1.15); }
+.tl-close { background: #ff5f57; }
+.tl-min   { background: #febc2e; }
+.tl-max   { background: #28c840; }
+
+/* Toolbar icon button */
+.tb-icon {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md);
+  color: var(--text-2);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+  flex-shrink: 0;
+  position: relative;
+}
+.tb-icon:hover        { background: var(--hover); color: var(--text); }
+.tb-icon.active       { background: var(--hover); color: var(--accent); }
+.tb-icon.panic:hover  { background: rgba(255,69,58,0.16); color: var(--red); }
+
+/* Back / Forward — flat, no pill container */
+.nav-pill { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+
+/* URL capsule (wider, Safari proportions) */
+.url-capsule {
+  flex: 1;
+  display: flex; align-items: center; gap: 7px;
+  height: 26px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  cursor: text;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.url-capsule:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-s);
+}
+.url-capsule input {
+  flex: 1; min-width: 0;
+  background: transparent; border: 0; outline: 0;
+  color: var(--text); font-size: 12px;
+}
+.url-capsule input::placeholder { color: var(--text-3); }
+.lock-icon { color: var(--green); display: flex; flex-shrink: 0; }
+
+/* Loading spinner inside URL capsule */
+.url-capsule.loading .reload-btn { display: none; }
+.url-capsule.loading::after {
+  content: ''; display: block; flex-shrink: 0;
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px solid var(--text-3); border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Reload button inside capsule */
+.reload-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  color: var(--text-3); flex-shrink: 0;
+  transition: color 0.12s, background 0.12s;
+}
+.reload-btn:hover { color: var(--text); background: var(--hover); }
+
+/* ══════════════════════════════════════════════════════════════
+   TAB BAR  (horizontal strip below toolbar — Safari style)
+   ══════════════════════════════════════════════════════════════ */
+.tab-bar {
+  display: flex; align-items: center;
+  height: 36px; padding: 0 8px; gap: 2px;
+  background-color: var(--glass-1);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: var(--rim-light);
+  overflow-x: auto; overflow-y: hidden;
+  flex-shrink: 0; position: relative; z-index: 39;
+  -webkit-app-region: drag;
+}
+.tab-bar::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  background: var(--sheen-top);
+  mix-blend-mode: screen;
+  z-index: 1;
+}
+.tab-bar > * { -webkit-app-region: no-drag; }
+.tab-bar::-webkit-scrollbar { display: none; }
+.tab-bar-end { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; }
+.tab-bar-new {
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 6px; color: var(--text-2);
+  font-size: 17px; line-height: 1; flex-shrink: 0;
+  transition: background 0.13s, color 0.13s;
+}
+.tab-bar-new:hover { background: var(--hover); color: var(--text); }
+
+/* ── Find Bar ───────────────────────────────────────────────────────────────── */
+.find-bar {
+  display: none; align-items: center; gap: 6px;
+  height: 36px; padding: 0 12px;
+  background: var(--surface); border-bottom: 1px solid var(--glass-border);
+}
+.find-bar.open { display: flex; }
+#findInput {
+  flex: 1; min-width: 0; max-width: 280px;
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  border-radius: var(--r-md); padding: 4px 8px;
+  color: var(--text); font-size: 12px; outline: 0;
+}
+#findInput:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-s); }
+#findInput.no-match { border-color: var(--red); }
+.find-count { font-size: 11px; color: var(--text-3); white-space: nowrap; min-width: 48px; }
+.find-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: var(--r-sm);
+  color: var(--text-2); transition: background 0.13s, color 0.13s;
+}
+.find-btn:hover { background: var(--hover); color: var(--text); }
+.find-close { margin-left: 2px; }
+
+/* Toolbar divider (kept for optional use) */
+.tb-divider { width: 1px; height: 16px; background: var(--glass-border); flex-shrink: 0; margin: 0 2px; }
+
+/* Badges */
+.badge {
+  position: absolute; top: 3px; right: 3px;
+  min-width: 14px; height: 14px; padding: 0 3px;
+  border-radius: var(--r-full);
+  background: var(--red); color: #fff;
+  font-size: 9px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+#vaultIndicator {
+  position: absolute; bottom: 4px; right: 4px;
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 1.5px solid var(--bg);
+  display: none;
+}
+
+/* Tooltip */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px; border-radius: var(--r-md);
+  border: 1px solid var(--glass-border);
+  background: rgba(38,38,40,0.96);
+  backdrop-filter: blur(12px);
+  color: var(--text); font-size: 11px; white-space: nowrap;
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.13s;
+  z-index: 9999;
+}
+[data-tip]:hover::after { opacity: 1; }
+
+/* Tab item — horizontal, Safari style */
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 8px 0 10px;
+  border-radius: 7px;
+  min-width: 80px; max-width: 200px;
+  flex-shrink: 1; cursor: pointer; color: var(--text-2);
+  font-size: 12px; overflow: hidden;
+  position: relative;
+  transition: background 0.13s var(--ease), color 0.13s var(--ease);
+}
+.tab:hover  { background: var(--hover); color: var(--text); }
+.tab.active { background: var(--surface); color: var(--text); }
+
+/* Container colour — 2px underline on active tab (design system spec) */
+.tab.active::after {
+  content: "";
+  position: absolute; left: 8px; right: 8px; bottom: 2px;
+  height: 2px; border-radius: 2px;
+  background: var(--c-default);
+}
+.tab.active.container-work::after     { background: var(--c-work); }
+.tab.active.container-social::after   { background: var(--c-social); }
+.tab.active.container-finance::after  { background: var(--c-finance); }
+.tab.active.container-research::after { background: var(--c-research); }
+.tab .favicon {
+  width: 13px; height: 13px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700; flex-shrink: 0;
+}
+.tab .title  { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.tab .close  {
+  width: 14px; height: 14px; border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; font-size: 10px; line-height: 1;
+  color: var(--text-3); flex-shrink: 0;
+  transition: opacity 0.1s, background 0.1s;
+}
+.tab:hover .close  { opacity: 1; }
+.tab .close:hover  { background: var(--hover); color: var(--text); }
+
+/* Containers section in sidebar */
+.sb-containers { padding: 2px 6px 8px; flex-shrink: 0; }
+.sb-ctr-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: var(--r-md);
+  font-size: 12px; color: var(--text-2); cursor: default;
+}
+.sb-ctr-dot   { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.sb-ctr-count { margin-left: auto; font-size: 10px; color: var(--text-3); }
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD
+   ══════════════════════════════════════════════════════════════ */
+.dashboard {
+  position: absolute; inset: 0;
+  overflow-y: auto; overflow-x: hidden;
+  z-index: 1; padding: 28px 24px;
+}
+.dashboard.hidden { display: none; }
+
+.dash-grid {
+  display: grid; grid-template-columns: 1fr 280px;
+  gap: 16px; max-width: 960px; margin: 0 auto 18px;
+}
+.hero-panel {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl); padding: 26px 26px 22px;
+}
+.hero-kicker { font-size: 11px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.hero-panel h1 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 10px; }
+.hero-panel > p { color: var(--text-2); font-size: 13px; line-height: 1.55; margin-bottom: 18px; }
+.dash-search {
+  display: flex; align-items: center; gap: 10px;
+  height: 36px; padding: 0 14px;
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.dash-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-s); }
+.dash-search input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 13px; }
+.dash-search input::placeholder { color: var(--text-3); }
+
+.status-card {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl); padding: 20px;
+}
+.status-card h2 { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
+.status-line { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--glass-border); }
+.status-line:last-child { border-bottom: none; }
+.status-line span { color: var(--text-2); }
+.status-line strong { color: var(--text); font-weight: 600; }
+#dashWipe { color: var(--accent); font-family: var(--mono); }
+
+.metric-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; max-width: 960px; margin: 0 auto 16px;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg); padding: 16px;
+}
+.metric-label  { font-size: 10px; color: var(--text-3); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+.metric-value  { font-size: 20px; font-weight: 700; }
+.metric-value.green  { color: var(--green); }
+.metric-value.violet { color: var(--accent); }
+.metric-value.yellow { color: var(--yellow); }
+.metric-value.red    { color: var(--red); }
+.metric-detail { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+.privacy-report {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl); padding: 20px;
+  max-width: 960px; margin: 0 auto 16px;
+}
+.privacy-report h3 { font-size: 13px; font-weight: 650; margin-bottom: 14px; }
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--glass-border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.report-stat {
+  background: var(--surface);
+  padding: 14px 16px;
+  text-align: center;
+}
+.report-stat-value {
+  font-size: 28px; font-weight: 700;
+  font-family: var(--mono);
+  font-feature-settings: "tnum";
+  line-height: 1.1; margin-bottom: 5px;
+}
+.report-stat-value.red   { color: var(--red); }
+.report-stat-value.green { color: var(--green); }
+.report-stat-value.yellow{ color: var(--yellow); }
+.report-stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+
+/* ══════════════════════════════════════════════════════════════
+   PRIVACY PANEL  (dropdown from shield button)
+   ══════════════════════════════════════════════════════════════ */
+.privacy-panel {
+  position: fixed;
+  top: 82px; right: 12px;
+  width: 300px;
+  max-height: calc(100vh - 98px);
+  overflow-y: auto;
+  z-index: 200;
+  display: none;
+  background-color: var(--glass-2);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-popover);
+  -webkit-backdrop-filter: var(--blur-popover);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow), var(--rim-light);
+  scrollbar-width: none;
+  padding: 6px;
+}
+.privacy-panel::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none; border-radius: inherit;
+  background: var(--sheen-top);
+  mix-blend-mode: screen;
+}
+.privacy-panel::-webkit-scrollbar { display: none; }
+.privacy-panel.open { display: block; }
+
+.pp-section { padding: 8px 8px 10px; }
+.pp-section + .pp-section { border-top: 1px solid var(--glass-border); }
+.pp-label {
+  font-size: 10px; font-weight: 750; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 0 4px; margin-bottom: 8px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.pp-label-val { font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-2); }
+
+.pp-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: var(--r-md);
+  font-size: 12px; cursor: pointer; color: var(--text-2);
+  transition: background 0.13s;
+}
+.pp-item:hover { background: var(--hover); color: var(--text); }
+
+/* Profile section */
+.pp-profile-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: var(--r-md);
+  cursor: pointer; transition: background 0.13s; margin-bottom: 4px;
+}
+.pp-profile-row:hover { background: var(--hover); }
+.pp-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.pp-profile-name { font-size: 13px; font-weight: 600; flex: 1; }
+
+.profile-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: var(--r-md);
+  font-size: 12px; cursor: pointer; color: var(--text-2);
+  transition: background 0.13s;
+}
+.profile-option:hover { background: var(--hover); color: var(--text); }
+.profile-option.selected { color: var(--text); }
+.pop-color { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pop-meta  { font-size: 10px; color: var(--text-3); font-family: var(--mono); margin-left: auto; }
+
+/* Vault state bar */
+.vault-state-bar {
+  display: flex; gap: 2px; padding: 3px;
+  background: var(--surface-2); border-radius: var(--r-md);
+  margin-bottom: 6px;
+}
+.vault-state-option {
+  flex: 1; padding: 6px 4px; border-radius: 7px;
+  text-align: center; font-size: 11px; cursor: pointer;
+  color: var(--text-3); transition: background 0.13s, color 0.13s;
+}
+.vault-state-option.active { background: var(--surface); color: var(--text); }
+.vault-state-option:hover:not(.active) { color: var(--text-2); }
+
+/* Wipe row */
+.pp-wipe-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.pp-wipe-time { font-size: 16px; font-weight: 700; color: var(--accent); flex: 1; }
+.pp-btn {
+  padding: 4px 10px; border-radius: var(--r-full);
+  background: var(--hover); border: 1px solid var(--glass-border);
+  font-size: 11px; color: var(--text-2); cursor: pointer;
+  transition: background 0.13s;
+}
+.pp-btn:hover { background: var(--surface-2); color: var(--text); }
+.pp-select {
+  padding: 4px 6px; border-radius: var(--r-full);
+  background: var(--hover); border: 1px solid var(--glass-border);
+  font-size: 11px; color: var(--text-2); cursor: pointer; font-family: var(--font);
+}
+
+/* Mini bars in privacy panel */
+
+/* ══════════════════════════════════════════════════════════════
+   SETTINGS PAGE
+   ══════════════════════════════════════════════════════════════ */
+.settings-view {
+  display: none; position: fixed; inset: 0; z-index: 100;
+  background: var(--bg); overflow: hidden;
+  flex-direction: row;
+}
+.settings-view.open { display: flex; }
+
+/* Left nav */
+.settings-nav {
+  width: 200px; flex-shrink: 0;
+  display: flex; flex-direction: column;
+  padding: 20px 10px;
+  border-right: 1px solid var(--glass-border);
+  background-color: var(--glass-2);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-popover);
+  -webkit-backdrop-filter: var(--blur-popover);
+  gap: 2px;
+}
+.settings-nav-title {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 0 8px 10px;
+}
+.settings-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 10px; border-radius: var(--r-md);
+  font-size: 13px; color: var(--text-2); cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+.settings-nav-item:hover { background: var(--hover); color: var(--text); }
+.settings-nav-item.active { background: var(--surface); color: var(--text); font-weight: 600; }
+.settings-nav-icon { width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* Main content */
+.settings-main {
+  flex: 1; overflow-y: auto; padding: 32px 40px;
+  scrollbar-width: thin; scrollbar-color: var(--glass-border) transparent;
+}
+.settings-main::-webkit-scrollbar { width: 5px; }
+.settings-main::-webkit-scrollbar-thumb { background: var(--glass-border); border-radius: 4px; }
+
+.settings-section { display: none; max-width: 580px; }
+.settings-section.active { display: block; }
+
+.settings-heading {
+  font-size: 22px; font-weight: 700; margin-bottom: 6px;
+}
+.settings-subheading {
+  font-size: 13px; color: var(--text-2); margin-bottom: 28px; line-height: 1.5;
+}
+
+/* Row */
+.s-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 0; border-bottom: 1px solid var(--glass-border);
+  gap: 24px;
+}
+.s-row:last-child { border-bottom: none; }
+.s-row-label { flex: 1; }
+.s-row-label strong { display: block; font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.s-row-label span { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+.s-row-ctrl { flex-shrink: 0; }
+
+/* Group card */
+.s-group {
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  padding: 0 16px; margin-bottom: 20px;
+  overflow: hidden;
+}
+.s-group-title {
+  font-size: 10px; font-weight: 750; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 14px 0 0; margin-bottom: -4px;
+}
+
+/* Toggle switch */
+.s-toggle { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+.s-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.s-toggle-track {
+  position: absolute; inset: 0; border-radius: 12px;
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  transition: background 0.18s, border-color 0.18s; cursor: pointer;
+}
+.s-toggle input:checked + .s-toggle-track { background: var(--text); border-color: var(--text); }
+.s-toggle-track::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--text-3); transition: left 0.18s, background 0.18s;
+}
+.s-toggle input:checked + .s-toggle-track::after { left: 20px; background: var(--bg); }
+
+/* Select */
+.s-select {
+  padding: 6px 10px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  color: var(--text); font-size: 12px; font-family: var(--font); cursor: pointer;
+}
+.s-select:focus { outline: none; border-color: var(--text); }
+
+/* Input */
+.s-input {
+  width: 100%; padding: 8px 12px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  color: var(--text); font-size: 13px; font-family: var(--font);
+  transition: border-color 0.15s;
+}
+.s-input:focus { outline: none; border-color: var(--text); }
+
+/* Button */
+.s-btn {
+  padding: 7px 16px; border-radius: var(--r-full);
+  background: var(--hover); border: 1px solid var(--glass-border);
+  color: var(--text-2); font-size: 12px; cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+}
+.s-btn:hover { background: var(--surface-2); color: var(--text); }
+.s-btn.danger { border-color: rgba(255,69,58,0.3); color: var(--red); }
+.s-btn.danger:hover { background: rgba(255,69,58,0.1); }
+.s-btn.primary { background: var(--text); color: var(--bg); border-color: transparent; }
+.s-btn.primary:hover { opacity: 0.85; }
+
+/* PIN change form */
+.s-pin-form { display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
+.s-pin-row { display: flex; gap: 8px; align-items: center; }
+.s-pin-row label { font-size: 12px; color: var(--text-2); width: 140px; flex-shrink: 0; }
+.s-pin-input {
+  flex: 1; padding: 7px 12px; border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--glass-border);
+  color: var(--text); font-size: 13px; font-family: var(--mono);
+  letter-spacing: 0.2em;
+}
+.s-pin-input:focus { outline: none; border-color: var(--text); }
+
+/* About */
+.s-about-logo {
+  width: 64px; height: 64px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--glass-border);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px; font-size: 28px;
+}
+.s-version { font-size: 13px; color: var(--text-2); margin-bottom: 20px; }
+.s-stat-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 24px; }
+.s-stat { background: var(--surface); border: 1px solid var(--glass-border); border-radius: var(--r-md); padding: 14px; text-align: center; }
+.s-stat-num { font-size: 22px; font-weight: 700; }
+.s-stat-lbl { font-size: 10px; color: var(--text-3); margin-top: 3px; }
+
+/* Close button */
+.settings-close {
+  position: absolute; top: 16px; right: 20px;
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--hover); color: var(--text-2); cursor: pointer;
+  font-size: 16px; line-height: 1;
+  transition: background 0.13s, color 0.13s;
+  z-index: 101;
+}
+.settings-close:hover { background: var(--surface-2); color: var(--text); }
+
+/* ══════════════════════════════════════════════════════════════
+   STATUS BAR
+   ══════════════════════════════════════════════════════════════ */
+.statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; height: 24px; padding: 0 14px; flex-shrink: 0;
+  position: relative;
+  border-top: 1px solid var(--glass-border);
+  color: var(--text-3); font-family: var(--mono); font-size: 10.5px;
+  background-color: var(--glass-1);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-chrome);
+  -webkit-backdrop-filter: var(--blur-chrome);
+  box-shadow: var(--rim-light);
+}
+.status-group { display: flex; align-items: center; gap: 14px; }
+.status-item  { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.status-dot   { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+/* ══════════════════════════════════════════════════════════════
+   POPOVERS  (generic + widget popover)
+   ══════════════════════════════════════════════════════════════ */
+.popover {
+  position: fixed; z-index: 250;
+  background-color: var(--glass-2);
+  background-image: var(--refract);
+  backdrop-filter: var(--blur-popover);
+  -webkit-backdrop-filter: var(--blur-popover);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow), var(--rim-light);
+  min-width: 180px; padding: 6px;
+  display: none;
+}
+.popover.open { display: block; }
+.popover::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none; border-radius: inherit;
+  background: var(--sheen-top);
+  mix-blend-mode: screen;
+}
+.popover-header { padding: 8px 10px 4px; font-size: 11px; font-weight: 750; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+
+#widgetPopover { width: 210px; }
+#widgetPopover label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; font-size: 12px; color: var(--text-2);
+  cursor: pointer; border-radius: var(--r-md);
+}
+#widgetPopover label:hover { background: var(--hover); color: var(--text); }
+#widgetPopover input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; }
+
+/* ══════════════════════════════════════════════════════════════
+   TAB CONTEXT MENU
+   ══════════════════════════════════════════════════════════════ */
+#tabContextMenu {
+  position: fixed; z-index: 600;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  padding: 4px; display: none;
+}
+#tabContextMenu.open { display: block; }
+.ctx-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; font-size: 12px; cursor: pointer;
+  color: var(--text-2); border-radius: var(--r-md);
+  transition: background 0.1s;
+}
+.ctx-item:hover { background: var(--hover); color: var(--text); }
+.ctx-label  { padding: 4px 12px; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+.ctx-divider { height: 1px; background: var(--glass-border); margin: 3px 0; }
+
+/* ══════════════════════════════════════════════════════════════
+   OVERLAYS  (focus blur, PIN, toast, screenshot)
+   ══════════════════════════════════════════════════════════════ */
+#focusBlurOverlay {
+  position: fixed; inset: 0; z-index: 500;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(12, 12, 14, 0.88);
+  backdrop-filter: blur(24px) saturate(0.3);
+  -webkit-backdrop-filter: blur(24px) saturate(0.3);
+  pointer-events: none;
+}
+#focusBlurOverlay.show { display: flex; }
+#focusBlurOverlay .blur-msg { color: rgba(245,245,247,0.22); font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.pin-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(10, 10, 12, 0.96);
+  backdrop-filter: blur(60px);
+  -webkit-backdrop-filter: blur(60px);
+}
+.pin-overlay.show { display: flex; }
+.pin-card  { text-align: center; }
+.lock-glyph { width: 56px; height: 56px; margin: 0 auto 24px; border-radius: 16px; display: flex; align-items: center; justify-content: center; background: linear-gradient(145deg, #d8d8dc, #6e6e74); }
+.pin-card h2 { font-size: 20px; margin-bottom: 6px; }
+.pin-card p  { color: var(--text-2); margin-bottom: 28px; }
+.pin-dots    { display: flex; justify-content: center; gap: 14px; margin-bottom: 24px; }
+.pdot        { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--glass-border); }
+.pdot.filled { background: var(--accent); border-color: var(--accent); }
+.pin-actions { display: flex; gap: 12px; justify-content: center; color: var(--text-3); font-size: 11px; }
+.pin-actions a { color: var(--text-2); cursor: pointer; }
+
+.browser-toast {
+  position: fixed; left: 50%; bottom: 38px; z-index: 1200;
+  transform: translateX(-50%) translateY(10px);
+  max-width: min(500px, calc(100vw - 40px));
+  padding: 8px 14px; border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border);
+  background: rgba(38,38,40,0.96);
+  backdrop-filter: blur(16px);
+  color: var(--text); box-shadow: var(--shadow-sm);
+  opacity: 0; pointer-events: none; font-size: 13px;
+  transition: opacity 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.browser-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Ghost mode indicator */
+body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
+
+/* Widget hidden */
+[data-widget-hidden="true"] { display: none !important; }
+
+/* Webview layer */
+.webview-layer { position: absolute; inset: 0; z-index: 0; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .metric-grid { grid-template-columns: repeat(2, 1fr); }
+  .report-stats { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══════════════════════════════════════════════════════
+       TOOLBAR — 38px, Safari proportions
+       ● ● ●  [⊟]  [‹][›]  🔒 url capsule ↻  [💬][🛡][⚡]
+       ═══════════════════════════════════════════════════════ -->
+  <div class="toolbar">
+    <!-- Traffic lights -->
+    <div class="traffic-lights">
+      <span class="tl-dot tl-close" id="btnClose"></span>
+      <span class="tl-dot tl-min"   id="btnMin"></span>
+      <span class="tl-dot tl-max"   id="btnMax"></span>
+    </div>
+
+    <!-- Back / Forward (flat, no pill) -->
+    <div class="nav-pill">
+      <button class="tb-icon" id="btnBack" data-tip="Back">
+        <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <button class="tb-icon" id="btnForward" data-tip="Forward">
+        <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>
+
+    <!-- URL capsule (centered, wide) -->
+    <div class="url-capsule" id="urlCapsule">
+      <span class="lock-icon">
+        <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+      </span>
+      <input id="urlInput" type="text" placeholder="Search privately, or enter address">
+      <button class="reload-btn" id="btnReload" data-tip="Reload">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      </button>
+    </div>
+
+
+    <!-- Privacy shield -->
+    <button class="tb-icon" id="btnPrivacy" data-tip="Privacy Controls">
+      <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg>
+      <span class="badge" id="reportBadge" style="display:none">0</span>
+      <span id="vaultIndicator"></span>
+    </button>
+
+    <!-- Panic bolt (double-click to wipe) -->
+    <button class="tb-icon panic" id="btnPanic" data-tip="Panic — double-click to wipe">
+      <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    </button>
+
+    <!-- Settings -->
+    <button class="tb-icon" id="btnSettings" data-tip="Settings">
+      <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+    </button>
+  </div><!-- /toolbar -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       TAB BAR — horizontal, Safari style
+       [Tab 1 ×] [Tab 2 ×] [Tab 3 ×]  [+]
+       ═══════════════════════════════════════════════════════ -->
+  <div class="tab-bar" id="tabBar">
+    <!-- tabs injected here by JS -->
+    <div class="tab-bar-end">
+      <button class="tab-bar-new" id="tabBarNewBtn" data-tip="New Tab">+</button>
+    </div>
+  </div><!-- /tabBar -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       FIND BAR
+       ═══════════════════════════════════════════════════════ -->
+  <div class="find-bar" id="findBar">
+    <input id="findInput" type="text" placeholder="Find in page…" autocomplete="off" spellcheck="false">
+    <span id="findCount" class="find-count"></span>
+    <button id="findPrev" class="find-btn" data-tip="Previous (Shift+Enter)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 15l-6-6-6 6"/></svg>
+    </button>
+    <button id="findNext" class="find-btn" data-tip="Next (Enter)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <button id="findClose" class="find-btn find-close" data-tip="Close (Esc)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       VIEWPORT
+       ═══════════════════════════════════════════════════════ -->
+  <div class="viewport">
+
+
+
+    <!-- CONTENT AREA -->
+    <div class="content">
+
+      <!-- DASHBOARD (shown when no tab is browsing) -->
+      <div class="dashboard" id="dashboard">
+
+        <!-- Row 1: hero + live status -->
+        <div class="dash-grid">
+          <section class="hero-panel">
+            <div class="hero-kicker"><span id="dashProfileKicker">Personal</span></div>
+            <h1>Browse freely. Leave nothing behind.</h1>
+            <p>VPN, wipe timer, vault, tracker blocking — all in one place. No shortcuts.</p>
+            <div class="dash-search">
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--text-3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+              <input id="dashboardSearch" type="text" placeholder="Search or enter a URL">
+            </div>
+          </section>
+
+          <aside class="status-card">
+            <h2>Live status</h2>
+            <div class="status-line"><span>VPN</span><strong id="dashVpn">Dev mode</strong></div>
+            <div class="status-line"><span>DNS</span><strong>1.1.1.1 DoH</strong></div>
+            <div class="status-line"><span>Next wipe</span><strong id="dashWipe">--:--:--</strong></div>
+          </aside>
+        </div>
+
+        <!-- Row 2: metric cards -->
+        <div class="metric-grid" id="metricGridSection" data-widget="metric-grid">
+          <div class="metric-card" data-widget="vpn">
+            <div class="metric-label">VPN Tunnel</div>
+            <div class="metric-value green" id="metricVpn">Ready</div>
+            <div class="metric-detail" id="metricVpnDetail">WARP proxy not configured</div>
+          </div>
+          <div class="metric-card" data-widget="wipe">
+            <div class="metric-label">Next Wipe</div>
+            <div class="metric-value violet" id="metricWipe">--:--</div>
+            <div class="metric-detail">All sessions purged</div>
+            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap;">
+              <button id="wipeNowBtn" class="pp-btn">Wipe now</button>
+              <select id="wipeIntervalSelect" class="pp-select">
+                <option value="1">1h</option><option value="6">6h</option>
+                <option value="12">12h</option><option value="24" selected>24h</option>
+                <option value="48">48h</option><option value="168">7d</option>
+              </select>
+            </div>
+          </div>
+          <div class="metric-card" data-widget="containers">
+            <div class="metric-label">Containers</div>
+            <div class="metric-value yellow">5</div>
+            <div class="metric-detail">Default · Work · Social · Finance · Research</div>
+          </div>
+          <div class="metric-card" data-widget="vault">
+            <div class="metric-label">Vault</div>
+            <div class="metric-value red" id="metricVault">Session</div>
+            <div class="metric-detail">Camera and mic policy</div>
+          </div>
+        </div>
+
+        <!-- Row 3: privacy report — full width -->
+        <section class="privacy-report" id="privacyReport" data-widget="privacy-report">
+          <h3>Privacy report</h3>
+          <div class="report-stats">
+            <div class="report-stat">
+              <div class="report-stat-value red" id="reportBlocked">0</div>
+              <div class="report-stat-label">trackers blocked</div>
+            </div>
+            <div class="report-stat">
+              <div class="report-stat-value green" id="reportSanitised">0</div>
+              <div class="report-stat-label">links sanitised</div>
+            </div>
+            <div class="report-stat">
+              <div class="report-stat-value yellow" id="reportMediaBlocked">0</div>
+              <div class="report-stat-label">camera denied</div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /dashboard -->
+
+      <!-- Native WebContentsView placeholder -->
+      <div class="webview-layer" id="webviewLayer"></div>
+
+    </div><!-- /content -->
+
+
+    <!-- ═══════════════════════════════════════════════════════
+         PRIVACY PANEL (dropdown from shield button)
+         ═══════════════════════════════════════════════════════ -->
+    <div class="privacy-panel popover" id="privacyPanel">
+
+      <!-- Profile -->
+      <div class="pp-section">
+        <div class="pp-label">Profile</div>
+        <div class="pp-profile-row">
+          <span class="pp-dot" id="activeProfileColor"></span>
+          <span class="pp-profile-name" id="activeProfileName">Personal</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-3)"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div id="profileList"></div>
+        <div class="pp-item" id="newProfileBtn">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14"/></svg>
+          New Profile
+        </div>
+        <div class="pp-item" id="unlockHiddenBtn" style="color:var(--text-3)">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Unlock Hidden Profile…
+        </div>
+      </div>
+
+      <!-- Camera & Mic Vault -->
+      <div class="pp-section">
+        <div class="pp-label">Camera &amp; Mic Vault <span class="pp-label-val" id="statusVault">Session</span></div>
+        <div class="vault-state-bar">
+          <div class="vault-state-option" data-mode="locked">Locked</div>
+          <div class="vault-state-option active" data-mode="session">Session</div>
+          <div class="vault-state-option" data-mode="timed">Timed 5m</div>
+        </div>
+        <div class="pp-item" id="lockVaultItem">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg>
+          Lock Vault Now
+        </div>
+      </div>
+
+      <!-- Wipe -->
+      <div class="pp-section">
+        <div class="pp-label">Session Wipe</div>
+        <div class="pp-wipe-row">
+          <span class="pp-wipe-time" id="panelWipeTime">--:--</span>
+          <button id="wipeNowPanelBtn" class="pp-btn">Wipe Now</button>
+          <select id="wipeIntervalPanelSelect" class="pp-select">
+            <option value="1">1h</option><option value="6">6h</option>
+            <option value="12">12h</option><option value="24" selected>24h</option>
+            <option value="48">48h</option><option value="168">7d</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Privacy Report mini -->
+      <div class="pp-section">
+        <div class="pp-label">Privacy Report <span class="pp-label-val" id="reportResetPanel">--:--</span></div>
+        <div style="display:flex;gap:12px;padding:6px 0;font-size:12px;">
+          <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--red)" id="panelReportBlocked">0</div><div style="color:var(--text-3);margin-top:2px">blocked</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--green)" id="panelReportSanitised">0</div><div style="color:var(--text-3);margin-top:2px">sanitised</div></div>
+          <div style="flex:1;text-align:center"><div style="font-size:18px;font-weight:700;color:var(--yellow)" id="panelReportMedia">0</div><div style="color:var(--text-3);margin-top:2px">cam denied</div></div>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="pp-section">
+        <div class="pp-label">Tools</div>
+        <div class="pp-item" id="screenshotPanelBtn">
+          <svg class="svg-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+          Safe Screenshot
+        </div>
+      </div>
+
+    </div><!-- /privacyPanel -->
+
+
+
+  </div><!-- /viewport -->
+
+  <!-- ═══════════════════════════════════════════════════════
+       SETTINGS PAGE
+       ═══════════════════════════════════════════════════════ -->
+  <div class="settings-view" id="settingsView">
+    <button class="settings-close" id="settingsClose" data-tip="Close Settings">×</button>
+
+    <!-- Left nav -->
+    <nav class="settings-nav">
+      <div class="settings-nav-title">Settings</div>
+      <div class="settings-nav-item active" data-section="general">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg></span>
+        General
+      </div>
+      <div class="settings-nav-item" data-section="security">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>
+        Security
+      </div>
+      <div class="settings-nav-item" data-section="privacy">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg></span>
+        Privacy
+      </div>
+      <div class="settings-nav-item" data-section="vpn">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg></span>
+        VPN
+      </div>
+      <div class="settings-nav-item" data-section="vault">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 10l-4 4-2-2"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>
+        Vault
+      </div>
+      <div class="settings-nav-item" data-section="containers">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+        Containers
+      </div>
+      <div class="settings-nav-item" data-section="about">
+        <span class="settings-nav-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+        About
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <div class="settings-main">
+
+      <!-- ── General ───────────────────────────────────── -->
+      <div class="settings-section active" id="s-general">
+        <div class="settings-heading">General</div>
+        <div class="settings-subheading">Appearance, startup, and toolbar preferences.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Toolbar</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Show Panic Button</strong>
+              <span>Display ⚡ in the toolbar. Always triggerable via Cmd+Shift+X.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sPanicVisible" checked><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Appearance</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Theme</strong>
+              <span>Follows system setting by default.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sTheme">
+              <option value="system">System</option>
+              <option value="dark">Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Search</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Search engine</strong>
+              <span>Used when you type a query in the URL bar or dashboard.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sSearchEngine">
+              <option value="ddg">DuckDuckGo</option>
+              <option value="brave">Brave Search</option>
+              <option value="startpage">Startpage</option>
+              <option value="google">Google</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Start Page</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>New Tab Page</strong>
+              <span>What to show when you open a new tab.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sStartPage">
+              <option value="dashboard">Privacy Dashboard</option>
+              <option value="blank">Blank</option>
+              <option value="custom">Custom URL</option>
+            </select>
+          </div>
+          <div class="s-row" id="sCustomUrlRow" style="display:none">
+            <div class="s-row-label"><strong>Custom URL</strong></div>
+            <input class="s-input s-row-ctrl" id="sCustomUrl" type="text" placeholder="https://…" style="max-width:240px">
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Restore Tabs After Wipe</strong>
+              <span>Re-open your previous tabs after the 24h session wipe.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sRestoreTabs" checked><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Security ──────────────────────────────────── -->
+      <div class="settings-section" id="s-security">
+        <div class="settings-heading">Security</div>
+        <div class="settings-subheading">PIN management, lock behaviour, and screen protection.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Change PIN</div>
+          <div class="s-pin-form">
+            <div class="s-pin-row"><label>Current PIN</label><input class="s-pin-input" type="password" id="sPinCurrent" maxlength="6" placeholder="••••••"></div>
+            <div class="s-pin-row"><label>New PIN</label><input class="s-pin-input" type="password" id="sPinNew" maxlength="6" placeholder="••••••"></div>
+            <div class="s-pin-row"><label>Confirm New PIN</label><input class="s-pin-input" type="password" id="sPinConfirm" maxlength="6" placeholder="••••••"></div>
+            <button class="s-btn primary" id="sPinSaveBtn" style="align-self:flex-start;margin-top:4px">Save PIN</button>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Change Decoy PIN</div>
+          <div class="s-pin-form">
+            <div class="s-pin-row"><label>Current PIN</label><input class="s-pin-input" type="password" id="sDecoyPinCurrent" maxlength="6" placeholder="••••••"></div>
+            <div class="s-pin-row"><label>New Decoy PIN</label><input class="s-pin-input" type="password" id="sDecoyPinNew" maxlength="6" placeholder="••••••"></div>
+            <div class="s-pin-row"><label>Confirm Decoy PIN</label><input class="s-pin-input" type="password" id="sDecoyPinConfirm" maxlength="6" placeholder="••••••"></div>
+            <button class="s-btn primary" id="sDecoyPinSaveBtn" style="align-self:flex-start;margin-top:4px">Save Decoy PIN</button>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Lock Behaviour</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Failed PIN Attempts Before Panic</strong>
+              <span>After this many wrong PINs, everything is wiped.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sPinAttempts">
+              <option value="3">3 attempts</option>
+              <option value="5" selected>5 attempts</option>
+              <option value="10">10 attempts</option>
+            </select>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Auto-Lock on Sleep</strong>
+              <span>Show PIN overlay when the machine sleeps or screen locks.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sAutoLock" checked><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Blur after switching away</strong>
+              <span>How long to wait before blurring content when the window loses focus.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sBlurDelay">
+              <option value="disabled">Disabled (always visible)</option>
+              <option value="0">Immediately</option>
+              <option value="30">After 30 seconds</option>
+              <option value="120">After 2 minutes</option>
+              <option value="300" selected>After 5 minutes</option>
+            </select>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Lock with PIN after blur</strong>
+              <span>Show PIN screen after the blur has been visible for this long. Requires blur to be enabled.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sBlackoutTimeout">
+              <option value="disabled">Never lock</option>
+              <option value="60">After 1 minute</option>
+              <option value="120" selected>After 2 minutes</option>
+              <option value="300">After 5 minutes</option>
+            </select>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Screen Capture Protection</strong>
+              <span>Prevents screenshots and screen recording of this window.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sScreenProtect" checked><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Privacy ───────────────────────────────────── -->
+      <div class="settings-section" id="s-privacy">
+        <div class="settings-heading">Privacy</div>
+        <div class="settings-subheading">Session wipe schedule and tracker protection.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Session Wipe</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Auto-Wipe Interval</strong>
+              <span>All storage, cache, and cookies cleared on this schedule.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sWipeInterval">
+              <option value="1">Every 1 hour</option>
+              <option value="6">Every 6 hours</option>
+              <option value="12">Every 12 hours</option>
+              <option value="24" selected>Every 24 hours</option>
+              <option value="48">Every 48 hours</option>
+              <option value="168">Every 7 days</option>
+            </select>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Wipe on Quit</strong>
+              <span>Clear all session data when Ram Browser is closed.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sWipeOnQuit"><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Reset Privacy Report on Wipe</strong>
+              <span>Clear tracker counts with each session wipe.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sReportReset" checked><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row" style="border-bottom:none">
+            <div class="s-row-label"><strong>Wipe Now</strong><span>Immediately clear all session data.</span></div>
+            <button class="s-btn danger s-row-ctrl" id="sWipeNowBtn">Wipe Now</button>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Tracker Protection</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Block Trackers &amp; Ads</strong>
+              <span>Block requests to known ad networks, analytics, and fingerprinting services at the network level.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sTrackerBlock" checked><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>HTTPS-Only Mode</strong>
+              <span>Automatically upgrade http:// requests to https://. Prevents plain-text traffic.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sHttpsOnly" checked><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Link Sanitiser</strong>
+              <span>Strip UTM, fbclid, gclid, and other tracking parameters from URLs.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sLinkSanitiser" checked><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Block Redirect Trackers</strong>
+              <span>Unwrap Facebook, Google, and LinkedIn redirect URLs.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sRedirectBlock" checked><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VPN ───────────────────────────────────────── -->
+      <div class="settings-section" id="s-vpn">
+        <div class="settings-heading">VPN</div>
+        <div class="settings-subheading">Route all traffic through a SOCKS5 or HTTP proxy. Works with Cloudflare WARP, Mullvad, NordVPN, or any custom proxy.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Connection</div>
+
+          <!-- Live status row -->
+          <div class="s-row">
+            <div class="s-row-label"><strong>Status</strong></div>
+            <span id="vpnStatusBadge" style="font-size:12px;font-family:var(--mono);color:var(--text-3)">Not connected</span>
+          </div>
+
+          <!-- Proxy URL input -->
+          <div class="s-row" style="flex-direction:column;align-items:stretch;gap:8px">
+            <div class="s-row-label">
+              <strong>Proxy URL</strong>
+              <span>e.g. <code style="font-family:var(--mono);font-size:11px">socks5://127.0.0.1:40000</code> &nbsp;·&nbsp; Cloudflare WARP uses port 40000.</span>
+            </div>
+            <div style="display:flex;gap:8px">
+              <input class="s-input" id="sProxyUrl" type="text" placeholder="socks5://127.0.0.1:40000" style="flex:1;min-width:0">
+              <button class="s-btn primary" id="sVpnConnect">Connect</button>
+            </div>
+          </div>
+
+          <!-- Action row -->
+          <div class="s-row" style="border-bottom:none;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;gap:8px">
+              <button class="s-btn" id="sVpnTest">Test Connection</button>
+              <button class="s-btn danger" id="sVpnDisconnect">Disconnect</button>
+            </div>
+            <span id="vpnTestResult" style="font-size:12px;color:var(--text-3);font-family:var(--mono);flex:1;text-align:right;align-self:center"></span>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Tor Routing</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Route through Tor</strong>
+              <span>Sends all traffic through Tor (requires Tor Browser or system Tor running on port 9150/9050). Overrides proxy URL above.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sTorEnabled"><span class="s-toggle-track"></span></label>
+          </div>
+          <div class="s-row" style="border-bottom:none">
+            <div class="s-row-label" style="color:var(--text-3);font-size:11px">
+              Tor Browser: <code style="font-family:var(--mono)">socks5://127.0.0.1:9150</code> &nbsp;·&nbsp; System Tor: port 9050.
+              <br>Note: Tor is slow. Use for anonymity, not daily browsing.
+            </div>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Kill Switch</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Require VPN to Browse</strong>
+              <span>Block all network requests when no proxy is configured. Enable only when a proxy is active.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sRequireVpn"><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Display</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Show VPN Latency</strong>
+              <span>Display connection latency in the status bar.</span>
+            </div>
+            <label class="s-toggle s-row-ctrl"><input type="checkbox" id="sShowLatency" checked><span class="s-toggle-track"></span></label>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">DNS</div>
+          <div class="s-row" style="border-bottom:none">
+            <div class="s-row-label">
+              <strong>DNS over HTTPS</strong>
+              <span>Cloudflare 1.1.1.1 — baked in at Chromium level. Cannot be changed.</span>
+            </div>
+            <span style="font-size:12px;color:var(--text-3);font-family:var(--mono)">1.1.1.1</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Vault ─────────────────────────────────────── -->
+      <div class="settings-section" id="s-vault">
+        <div class="settings-heading">Camera &amp; Mic Vault</div>
+        <div class="settings-subheading">Control when sites can access your camera and microphone.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Defaults</div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Default Vault State</strong>
+              <span>Applied when Ram Browser launches.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sVaultDefault">
+              <option value="locked" selected>Locked</option>
+              <option value="session">Session</option>
+              <option value="timed">Timed</option>
+            </select>
+          </div>
+          <div class="s-row">
+            <div class="s-row-label">
+              <strong>Timed Grant Duration</strong>
+              <span>How long a timed vault grant lasts before auto-revoking.</span>
+            </div>
+            <select class="s-select s-row-ctrl" id="sVaultDuration">
+              <option value="60">1 minute</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="900">15 minutes</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Finance Container</div>
+          <div class="s-row" style="border-bottom:none">
+            <div class="s-row-label">
+              <strong>Vault Always Locked</strong>
+              <span>Camera and mic are permanently blocked in Finance tabs. This cannot be changed.</span>
+            </div>
+            <span style="font-size:12px;color:var(--text-3)">Enforced</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Containers ────────────────────────────────── -->
+      <div class="settings-section" id="s-containers">
+        <div class="settings-heading">Containers</div>
+        <div class="settings-subheading">Each container has fully isolated storage, cookies, and sessions.</div>
+
+        <div class="s-group">
+          <div class="s-group-title">Manual Wipe</div>
+          <div class="s-row"><div class="s-row-label"><strong>Default</strong><span>General browsing container.</span></div><button class="s-btn s-row-ctrl" data-wipe-container="default">Wipe</button></div>
+          <div class="s-row"><div class="s-row-label"><strong>Work</strong><span>Work accounts and tools.</span></div><button class="s-btn s-row-ctrl" data-wipe-container="work">Wipe</button></div>
+          <div class="s-row"><div class="s-row-label"><strong>Social</strong><span>Social media — isolated from everything else.</span></div><button class="s-btn s-row-ctrl" data-wipe-container="social">Wipe</button></div>
+          <div class="s-row"><div class="s-row-label"><strong>Finance</strong><span style="color:var(--red)">Hardened: JS blocked · Vault locked · No notifications.</span></div><button class="s-btn s-row-ctrl" data-wipe-container="finance">Wipe</button></div>
+          <div class="s-row" style="border-bottom:none"><div class="s-row-label"><strong>Research</strong><span>For sensitive research and investigative browsing.</span></div><button class="s-btn s-row-ctrl" data-wipe-container="research">Wipe</button></div>
+        </div>
+      </div>
+
+      <!-- ── About ─────────────────────────────────────── -->
+      <div class="settings-section" id="s-about">
+        <div class="settings-heading">About</div>
+        <div class="settings-subheading">Ram Browser — privacy-first Electron browser.</div>
+
+        <div class="s-about-logo">🔒</div>
+        <div class="s-version">Ram Browser · v0.1.0 · Electron 41 · Chromium</div>
+
+        <div class="s-stat-grid">
+          <div class="s-stat"><div class="s-stat-num">131</div><div class="s-stat-lbl">Unit Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">8</div><div class="s-stat-lbl">E2E Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">116</div><div class="s-stat-lbl">Features</div></div>
+        </div>
+
+        <div class="s-group">
+          <div class="s-group-title">Reset</div>
+          <div class="s-row" style="border-bottom:none">
+            <div class="s-row-label">
+              <strong>Reset All Settings to Defaults</strong>
+              <span>Clears all preferences. Does not affect profiles or session data.</span>
+            </div>
+            <button class="s-btn danger s-row-ctrl" id="sResetAllBtn">Reset</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /settings-main -->
+  </div><!-- /settingsView -->
+
+
+
+  <!-- STATUS BAR -->
+  <div class="statusbar">
+    <div class="status-group">
+      <div class="status-item"><span class="status-dot" id="statusWarpDot"></span><span id="statusWarp">WARP: development</span></div>
+      <div class="status-item"><span>DNS: 1.1.1.1 DoH</span></div>
+      <div class="status-item"><span>Vault: <span id="statusVaultBar">Session</span></span></div>
+    </div>
+    <div class="status-group">
+      <div class="status-item"><span>5 containers</span></div>
+      <div class="status-item"><span>Wipe in <span id="statusWipe">--:--:--</span></span></div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     GLOBAL OVERLAYS
+     ═══════════════════════════════════════════════════════ -->
+
+<!-- New Profile modal -->
+<div class="pin-overlay" id="newProfileOverlay" style="display:none;z-index:600;">
+  <div class="pin-card" style="width:320px;gap:10px;padding:24px;">
+    <h2 style="font-size:16px;margin-bottom:4px;">New Profile</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;width:100%;">
+      <input id="npName" type="text" maxlength="32" placeholder="Profile name" style="padding:7px 10px;border-radius:8px;border:1px solid var(--glass-border);background:var(--surface-2);color:var(--text);font-size:13px;width:100%;">
+      <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:8px;">
+        Color
+        <input id="npColor" type="color" value="#a78bfa" style="width:32px;height:24px;border:none;background:none;cursor:pointer;padding:0;">
+      </label>
+      <input id="npPin" type="password" maxlength="6" placeholder="PIN (optional, 4–6 digits)" style="padding:7px 10px;border-radius:8px;border:1px solid var(--glass-border);background:var(--surface-2);color:var(--text);font-size:13px;width:100%;">
+      <label style="font-size:12px;color:var(--text-2);display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="npHidden"> Hidden profile (invisible in list)
+      </label>
+      <input id="npPhrase" type="text" placeholder="Unlock phrase for hidden profile" style="padding:7px 10px;border-radius:8px;border:1px solid var(--glass-border);background:var(--surface-2);color:var(--text);font-size:13px;width:100%;display:none;">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px;width:100%;">
+      <button id="npCancelBtn" style="flex:1;padding:8px;border-radius:8px;background:var(--surface-2);color:var(--text);border:1px solid var(--glass-border);cursor:pointer;font-size:13px;">Cancel</button>
+      <button id="npCreateBtn" style="flex:1;padding:8px;border-radius:8px;background:var(--accent-s);color:var(--text);border:1px solid var(--glass-border);cursor:pointer;font-size:13px;font-weight:600;">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Unlock hidden profile modal -->
+<div class="pin-overlay" id="unlockHiddenOverlay" style="display:none;z-index:600;">
+  <div class="pin-card" style="width:300px;gap:12px;padding:24px;">
+    <h2 style="font-size:16px;margin-bottom:4px;">Unlock Hidden Profile</h2>
+    <p style="font-size:12px;color:var(--text-2);text-align:center;">Enter the unlock phrase for the hidden profile.</p>
+    <input id="uhPhrase" type="text" placeholder="Unlock phrase" style="padding:7px 10px;border-radius:8px;border:1px solid var(--glass-border);background:var(--surface-2);color:var(--text);font-size:13px;width:100%;">
+    <div style="display:flex;gap:8px;width:100%;">
+      <button id="uhCancelBtn" style="flex:1;padding:8px;border-radius:8px;background:var(--surface-2);color:var(--text);border:1px solid var(--glass-border);cursor:pointer;font-size:13px;">Cancel</button>
+      <button id="uhUnlockBtn" style="flex:1;padding:8px;border-radius:8px;background:var(--accent-s);color:var(--text);border:1px solid var(--glass-border);cursor:pointer;font-size:13px;font-weight:600;">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- PIN overlay -->
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-card">
+    <div class="lock-glyph">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+    </div>
+    <h2>Ram Browser is locked</h2>
+    <p>Enter your PIN to continue.</p>
+    <div class="pin-dots">
+      <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
+      <span class="pdot"></span><span class="pdot"></span><span class="pdot"></span>
+    </div>
+    <div class="pin-actions"><a id="closePin">Cancel</a></div>
+  </div>
+</div>
+
+<!-- Focus blur overlay -->
+<div id="focusBlurOverlay"><span class="blur-msg">Protected</span></div>
+
+<!-- Toast -->
+<div class="browser-toast" id="browserToast"></div>
+
+<!-- Screenshot selection overlay -->
+<div id="screenshotOverlay" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,0.72);cursor:crosshair;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div style="color:rgba(245,245,247,0.6);font-size:12px;pointer-events:none;">Drag to select region · Esc to cancel · Enter to capture full window</div>
+  <div id="screenshotSelection" style="position:absolute;border:2px solid var(--accent);display:none;pointer-events:none;"></div>
+</div>
+
+<!-- Screenshot preview -->
+<div id="screenshotPreview" style="display:none;position:fixed;inset:0;z-index:750;background:rgba(0,0,0,0.88);align-items:center;justify-content:center;flex-direction:column;gap:14px;">
+  <div style="color:var(--text-3);font-size:11px;">Drag to add blur box · Esc to cancel</div>
+  <div id="screenshotImgWrap" style="position:relative;display:inline-block;">
+    <img id="screenshotImg" style="max-width:80vw;max-height:65vh;border:1px solid var(--glass-border);border-radius:10px;display:block;" src="" alt="">
+    <canvas id="blurOverlayCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;cursor:crosshair;border-radius:10px;"></canvas>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;">
+    <button id="screenshotApplyBlurBtn" class="pp-btn">Apply Blurs</button>
+    <button id="screenshotClearBlurBtn" class="pp-btn">Clear</button>
+    <div style="width:1px;height:22px;background:var(--glass-border);"></div>
+    <button id="screenshotSaveBtn" style="padding:7px 18px;border-radius:var(--r-lg);background:var(--accent);border:0;color:white;cursor:pointer;font-size:13px;font-weight:600;">Save to disk</button>
+    <button id="screenshotCopyBtn" class="pp-btn">Copy to clipboard</button>
+    <button id="screenshotCancelBtn" class="pp-btn">Cancel</button>
+  </div>
+</div>
+
+<!-- Tab context menu -->
+<div id="tabContextMenu">
+  <div class="ctx-label">Move to container</div>
+  <div class="ctx-item" data-container="default">Default</div>
+  <div class="ctx-item" data-container="work">Work</div>
+  <div class="ctx-item" data-container="social">Social</div>
+  <div class="ctx-item" data-container="finance">Finance</div>
+  <div class="ctx-item" data-container="research">Research</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item" id="ctxWipeContainer">Wipe this container</div>
+  <div class="ctx-item" id="ctxForgetOnWipe">Forget on wipe: <span id="ctxForgetLabel">Off</span></div>
+  <div class="ctx-item" id="ctxCloseTab">Close tab</div>
+</div>
+
+<!-- Widget customise popover -->
+<div class="popover" id="widgetPopover">
+  <div class="popover-header">Dashboard Widgets</div>
+  <label><input type="checkbox" id="wVpn" checked> VPN Tunnel</label>
+  <label><input type="checkbox" id="wWipe" checked> Next Wipe</label>
+  <label><input type="checkbox" id="wContainers" checked> Containers</label>
+  <label><input type="checkbox" id="wVault" checked> Vault</label>
+  <label><input type="checkbox" id="wPrivacyReport" checked> Privacy Report</label>
+</div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const hasBridge = Boolean(window.phantom);
+if (hasBridge) document.body.classList.add('electron');
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const SEARCH_ENGINES = {
+  ddg:       'https://duckduckgo.com/?q=',
+  brave:     'https://search.brave.com/search?q=',
+  startpage: 'https://www.startpage.com/search?q=',
+  google:    'https://www.google.com/search?q=',
+};
+const DEFAULT_SEARCH_URL = SEARCH_ENGINES.ddg;
+const partitionByContainer = {
+  default: 'ram-default', work: 'ram-work',
+  social: 'ram-social', finance: 'ram-finance', research: 'ram-research'
+};
+const containerClasses = {
+  work: 'container-work', social: 'container-social',
+  finance: 'container-finance', research: 'container-research'
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let tabSeq = 0;
+let activeTabId = null;
+let toastTimer = null;
+let currentProfile = null;
+let profilePendingUuid = null;
+let pinBuffer = '';
+let lockScreenMode = false;
+let panicClicks = 0;
+const tabs = new Map();
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function showToast(message, duration = 3200) {
+  const t = $('#browserToast');
+  t.textContent = message;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ── Popover / Panel helpers ───────────────────────────────────────────────────
+function closeAllPopovers() {
+  $$('.popover.open').forEach((p) => p.classList.remove('open'));
+}
+function openPopover(el) {
+  closeAllPopovers();
+  el.classList.add('open');
+}
+
+// Close popovers on outside click
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.popover') && !e.target.closest('#btnPrivacy')) {
+    closeAllPopovers();
+  }
+});
+
+// Shield button → toggle privacy panel
+$('#btnPrivacy').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const p = $('#privacyPanel');
+  if (p.classList.contains('open')) { closeAllPopovers(); } else { openPopover(p); }
+});
+
+// ── Vault ─────────────────────────────────────────────────────────────────────
+function applyVaultIndicator(mode, expiresAt) {
+  const ind = $('#vaultIndicator');
+  if (!ind) return;
+  if (mode === 'session') {
+    ind.style.display = 'block'; ind.style.background = 'var(--green)';
+  } else if (mode === 'timed') {
+    ind.style.display = 'block'; ind.style.background = 'var(--yellow)';
+  } else {
+    ind.style.display = 'none';
+  }
+}
+
+function setVaultMode(mode, label, durationMs) {
+  $$('.vault-state-option').forEach((o) => o.classList.toggle('active', o.dataset.mode === mode));
+  const labels = { locked: 'Locked', session: 'Session', timed: 'Timed' };
+  const lbl = labels[mode] || label || mode;
+  const mv = $('#metricVault'); if (mv) mv.textContent = lbl;
+  const sv = $('#statusVault'); if (sv) sv.textContent = lbl;
+  const svb = $('#statusVaultBar'); if (svb) svb.textContent = lbl;
+  applyVaultIndicator(mode, durationMs ? Date.now() + durationMs : null);
+  window.phantom?.vault?.setMode(mode, durationMs).catch((err) => showToast(err.message));
+}
+
+if (hasBridge && window.phantom?.vault?.onChange) {
+  window.phantom.vault.onChange(({ mode, timedExpired, expiresAt }) => {
+    const labels = { locked: 'Locked', session: 'Session', timed: 'Timed' };
+    $$('.vault-state-option').forEach((o) => o.classList.toggle('active', o.dataset.mode === mode));
+    const lbl = labels[mode] || mode;
+    const mv = $('#metricVault'); if (mv) mv.textContent = lbl;
+    const sv = $('#statusVault'); if (sv) sv.textContent = lbl;
+    const svb = $('#statusVaultBar'); if (svb) svb.textContent = lbl;
+    applyVaultIndicator(mode, expiresAt);
+    if (timedExpired) {
+      showToast('Vault timed grant expired — now locked.');
+      window.phantom?.notify('RAM Browser', 'Vault timed grant expired — now locked.');
+    }
+  });
+}
+
+$$('.vault-state-option').forEach((o) => {
+  o.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const mode = o.dataset.mode;
+    // Use configured timed duration (feature #60)
+    const durationMs = mode === 'timed' ? (Number(loadSettings().vaultDuration) || 300) * 1000 : undefined;
+    setVaultMode(mode, o.textContent.trim(), durationMs);
+  });
+});
+
+$('#lockVaultItem').addEventListener('click', (e) => {
+  e.stopPropagation();
+  setVaultMode('locked', 'Locked');
+  closeAllPopovers();
+  showToast('Vault locked.');
+});
+
+// ── Profiles ─────────────────────────────────────────────────────────────────
+async function loadProfiles() {
+  if (!hasBridge) return;
+  try {
+    const [profiles, active] = await Promise.all([
+      window.phantom.profiles.list(),
+      window.phantom.profiles.active()
+    ]);
+    renderProfileList(profiles, active?.uuid);
+    if (active) { currentProfile = active; updateActiveProfileChip(active); }
+  } catch {}
+}
+
+function renderProfileList(profiles, activeUuid) {
+  const list = $('#profileList');
+  if (!list) return;
+  list.innerHTML = '';
+  for (const p of profiles) {
+    const item = document.createElement('div');
+    item.className = 'profile-option' + (p.uuid === activeUuid ? ' selected' : '');
+    item.dataset.profileUuid = p.uuid;
+    const colorDot = document.createElement('span'); colorDot.className = 'pop-color'; colorDot.style.background = p.color || '#a78bfa';
+    const nameSpan = document.createElement('span'); nameSpan.style.flex = '1'; nameSpan.textContent = p.name;
+    const metaSpan = document.createElement('span'); metaSpan.className = 'pop-meta'; metaSpan.textContent = p.hasPin ? 'PIN' : '';
+    item.append(colorDot, nameSpan, metaSpan);
+    item.addEventListener('click', (e) => { e.stopPropagation(); handleProfileSwitch(p.uuid, p.hasPin); });
+    list.appendChild(item);
+  }
+}
+
+function updateActiveProfileChip(profile) {
+  const n = profile.name || 'Personal';
+  const c = profile.color || '#a78bfa';
+  const sbN = $('#sbProfileName'); if (sbN) sbN.textContent = n;
+  const sbC = $('#sbProfileColor'); if (sbC) sbC.style.background = c;
+  const apN = $('#activeProfileName'); if (apN) apN.textContent = n;
+  const apC = $('#activeProfileColor'); if (apC) apC.style.background = c;
+  const dk = $('#dashProfileKicker'); if (dk) dk.textContent = n;
+  $$('.profile-option').forEach((el) => el.classList.toggle('selected', el.dataset.profileUuid === profile.uuid));
+}
+
+async function handleProfileSwitch(uuid, hasPin) {
+  closeAllPopovers();
+  if (hasPin) {
+    profilePendingUuid = uuid;
+    lockScreenMode = false;
+    pinBuffer = '';
+    updatePinDots();
+    $('#pinOverlay').classList.add('show');
+    return;
+  }
+  if (!hasBridge) return;
+  try {
+    const result = await window.phantom.profiles.switch(uuid, null);
+    if (result.result === 'ok') {
+      currentProfile = result.profile;
+      updateActiveProfileChip(result.profile);
+      resetToDashboard();
+      showToast(`Switched to ${result.profile?.name}`);
+    }
+  } catch (err) { showToast(err.message); }
+}
+
+window.phantom?.profiles?.onSwitch?.((profile) => {
+  currentProfile = profile;
+  updateActiveProfileChip(profile);
+  window.phantom?.notify('RAM Browser', `Switched to ${profile?.name || 'profile'}.`);
+});
+
+// ── New Profile modal ─────────────────────────────────────────────────────────
+$('#newProfileBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeAllPopovers();
+  $('#npName').value = '';
+  $('#npPin').value = '';
+  $('#npPhrase').value = '';
+  $('#npHidden').checked = false;
+  $('#npPhrase').style.display = 'none';
+  $('#newProfileOverlay').style.display = 'flex';
+});
+$('#npHidden').addEventListener('change', (e) => {
+  $('#npPhrase').style.display = e.target.checked ? '' : 'none';
+});
+$('#npCancelBtn').addEventListener('click', () => { $('#newProfileOverlay').style.display = 'none'; });
+$('#npCreateBtn').addEventListener('click', async () => {
+  if (!hasBridge) { showToast('Run npm start to create profiles.'); return; }
+  const name = $('#npName').value.trim();
+  if (!name) { showToast('Enter a profile name.'); return; }
+  const pin = $('#npPin').value.trim();
+  const hidden = $('#npHidden').checked;
+  const phrase = $('#npPhrase').value.trim();
+  if (hidden && !phrase) { showToast('Enter an unlock phrase for the hidden profile.'); return; }
+  if (pin && (pin.length < 4 || !/^\d+$/.test(pin))) { showToast('PIN must be 4–6 digits.'); return; }
+  try {
+    const colors = ['#a78bfa','#30d158','#0a84ff','#ff453a','#ffd60a','#ff6b35'];
+    const color = $('#npColor').value || colors[Math.floor(Math.random() * colors.length)];
+    const profile = await window.phantom.profiles.create({ name, color, hidden });
+    if (pin) await window.phantom.pin.set(profile.uuid, pin);
+    if (hidden && phrase) await window.phantom.profiles.setUnlockPhrase(profile.uuid, phrase);
+    $('#newProfileOverlay').style.display = 'none';
+    showToast(`Profile "${name}" created.`);
+    await loadProfiles();
+  } catch (err) { showToast(err.message); }
+});
+
+// ── Unlock hidden profile modal ───────────────────────────────────────────────
+$('#unlockHiddenBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  closeAllPopovers();
+  $('#uhPhrase').value = '';
+  $('#unlockHiddenOverlay').style.display = 'flex';
+});
+$('#uhCancelBtn').addEventListener('click', () => { $('#unlockHiddenOverlay').style.display = 'none'; });
+$('#uhUnlockBtn').addEventListener('click', async () => {
+  if (!hasBridge) { showToast('Run npm start.'); return; }
+  const phrase = $('#uhPhrase').value.trim();
+  if (!phrase) { showToast('Enter the unlock phrase.'); return; }
+  try {
+    const result = await window.phantom.profiles.unlockHidden(phrase);
+    if (!result.found) { showToast('No hidden profile matched that phrase.'); return; }
+    $('#unlockHiddenOverlay').style.display = 'none';
+    currentProfile = result.profile;
+    updateActiveProfileChip(result.profile);
+    resetToDashboard();
+    showToast(`Unlocked: ${result.profile.name}`);
+  } catch (err) { showToast(err.message); }
+});
+
+// ── PIN overlay ───────────────────────────────────────────────────────────────
+let pinFailCount = 0;
+let PIN_PANIC_THRESHOLD = 5; // updated from settings in applyLiveSettings
+let pinLockoutUntil = 0;
+
+function pinLockoutDuration(n) { return Math.min(60 * Math.pow(2, n - 1), 3600) * 1000; }
+function isPinLockedOut() { return Date.now() < pinLockoutUntil; }
+
+function startPinLockout() {
+  const dur = pinLockoutDuration(pinFailCount);
+  pinLockoutUntil = Date.now() + dur;
+  const secs = Math.round(dur / 1000);
+  showToast(`PIN locked for ${secs >= 60 ? Math.round(secs / 60) + ' min' : secs + 's'}.`, Math.min(dur, 5000));
+  const dots = $('.pin-dots'); if (dots) dots.style.opacity = '0.35';
+}
+
+function updatePinDots() {
+  $$('.pdot').forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'F12') {
+    const wv = activeTab()?.webview;
+    if (wv) { wv.isDevToolsOpened() ? wv.closeDevTools() : wv.openDevTools(); }
+    return;
+  }
+  if (!$('#pinOverlay').classList.contains('show')) return;
+  if (e.key >= '0' && e.key <= '9') {
+    if (pinBuffer.length >= 6) return;
+    pinBuffer += e.key;
+    updatePinDots();
+    if (pinBuffer.length === 6) submitPin();
+  } else if (e.key === 'Backspace') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    updatePinDots();
+  } else if (e.key === 'Escape' && !lockScreenMode) {
+    $('#pinOverlay').classList.remove('show');
+    profilePendingUuid = null;
+    pinBuffer = '';
+  }
+});
+
+async function submitPin() {
+  if (!hasBridge) return;
+  if (isPinLockedOut()) {
+    showToast(`PIN locked. Wait ${Math.ceil((pinLockoutUntil - Date.now()) / 1000)}s.`);
+    pinBuffer = ''; updatePinDots(); return;
+  }
+  const pin = pinBuffer;
+  pinBuffer = ''; updatePinDots();
+  try {
+    if (lockScreenMode) {
+      const r = await window.phantom.pin.verify(currentProfile?.uuid, pin);
+      if (r === 'valid' || r === 'decoy') {
+        pinFailCount = 0; lockScreenMode = false;
+        $('#pinOverlay').classList.remove('show');
+        hideFocusBlur();
+        window.phantom.security.screenUnlocked?.();
+      } else {
+        pinFailCount++;
+        if (pinFailCount >= PIN_PANIC_THRESHOLD) { pinFailCount = 0; pinLockoutUntil = 0; showToast('Too many wrong attempts — triggering panic wipe.'); triggerPanic(); }
+        else { startPinLockout(); showToast(`Incorrect PIN (${PIN_PANIC_THRESHOLD - pinFailCount} left before panic)`); }
+      }
+    } else if (profilePendingUuid) {
+      const result = await window.phantom.profiles.switch(profilePendingUuid, pin);
+      if (result.result === 'ok' || result.result === 'decoy') {
+        pinFailCount = 0; pinLockoutUntil = 0; profilePendingUuid = null;
+        currentProfile = result.profile;
+        $('#pinOverlay').classList.remove('show');
+        updateActiveProfileChip(result.profile);
+        resetToDashboard();
+        showToast(`Switched to ${result.profile?.name}`);
+      } else {
+        pinFailCount++;
+        if (pinFailCount >= PIN_PANIC_THRESHOLD) { pinFailCount = 0; pinLockoutUntil = 0; showToast('Too many wrong attempts — triggering panic wipe.'); triggerPanic(); }
+        else { startPinLockout(); showToast(`Incorrect PIN (${PIN_PANIC_THRESHOLD - pinFailCount} left before panic)`); }
+      }
+    }
+  } catch (err) { showToast(err.message); }
+}
+
+$('#closePin').addEventListener('click', () => {
+  if (lockScreenMode) return;
+  $('#pinOverlay').classList.remove('show');
+  profilePendingUuid = null; pinBuffer = '';
+});
+
+// ── Wipe engine ───────────────────────────────────────────────────────────────
+function applyWipeCountdown(data) {
+  const fmt = data?.formatted || '--:--:--';
+  const short = fmt.length >= 5 ? fmt.slice(0, 5) : fmt;
+  const sw = $('#statusWipe'); if (sw) sw.textContent = fmt;
+  const dw = $('#dashWipe'); if (dw) dw.textContent = fmt;
+  const mw = $('#metricWipe'); if (mw) mw.textContent = short;
+  const pw = $('#panelWipeTime'); if (pw) pw.textContent = short;
+  const rp = $('#reportResetPanel'); if (rp) rp.textContent = fmt.slice(0, 5);
+}
+
+function updatePrivacyReport(report) {
+  if (!report) return;
+  const { blocked = 0, sanitised = 0, mediaBlocked = 0 } = report;
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set('#reportBlocked',      blocked.toLocaleString());
+  set('#reportSanitised',    sanitised.toLocaleString());
+  set('#reportMediaBlocked', mediaBlocked.toLocaleString());
+  set('#panelReportBlocked',   blocked.toLocaleString());
+  set('#panelReportSanitised', sanitised.toLocaleString());
+  set('#panelReportMedia',     mediaBlocked.toLocaleString());
+  const total = blocked + sanitised + mediaBlocked;
+  const badge = $('#reportBadge');
+  if (badge) { badge.textContent = total > 99 ? '99+' : String(total); badge.style.display = total > 0 ? '' : 'none'; }
+}
+
+async function pollPrivacyReport() {
+  if (!hasBridge) return;
+  try { updatePrivacyReport(await window.phantom.privacy.getReport()); } catch {}
+}
+
+async function initWipe() {
+  if (!hasBridge) return;
+  try { const d = await window.phantom.wipe.getCountdown(); if (d) applyWipeCountdown(d); } catch {}
+  window.phantom.wipe.onCountdown((d) => applyWipeCountdown(d));
+  window.phantom.wipe.onWipeDone(() => {
+    showToast('Wipe complete. All session data cleared.');
+    window.phantom?.notify('RAM Browser', 'Wipe complete. All session data cleared.');
+    applyWipeCountdown({ formatted: '--:--:--' });
+    updatePrivacyReport({ blocked: 0, sanitised: 0, mediaBlocked: 0, requests: 0 });
+    resetToDashboard();
+  });
+  pollPrivacyReport();
+  if (window._privacyPollInterval) clearInterval(window._privacyPollInterval);
+  window._privacyPollInterval = setInterval(pollPrivacyReport, 15000);
+}
+
+$('#wipeNowBtn')?.addEventListener('click', async () => {
+  if (!hasBridge) { showToast('Run npm start to use wipe.'); return; }
+  try { await window.phantom.wipe.triggerNow(); showToast('Wipe triggered.'); } catch (err) { showToast(err.message); }
+});
+$('#wipeNowPanelBtn')?.addEventListener('click', async () => {
+  if (!hasBridge) { showToast('Run npm start to use wipe.'); return; }
+  try { await window.phantom.wipe.triggerNow(); showToast('Wipe triggered.'); closeAllPopovers(); } catch (err) { showToast(err.message); }
+});
+
+function syncWipeInterval(hours) {
+  $$('#wipeIntervalSelect, #wipeIntervalPanelSelect').forEach((s) => {
+    const opt = s.querySelector(`option[value="${hours}"]`);
+    if (opt) opt.selected = true;
+  });
+}
+
+$('#wipeIntervalSelect')?.addEventListener('change', async (e) => {
+  if (!hasBridge) return;
+  const hours = parseInt(e.target.value, 10);
+  try { const r = await window.phantom.wipe.setInterval(hours); if (r?.ok) { showToast(`Wipe interval set to ${r.hours}h`); syncWipeInterval(r.hours); } } catch {}
+});
+$('#wipeIntervalPanelSelect')?.addEventListener('change', async (e) => {
+  if (!hasBridge) return;
+  const hours = parseInt(e.target.value, 10);
+  try { const r = await window.phantom.wipe.setInterval(hours); if (r?.ok) { showToast(`Wipe interval set to ${r.hours}h`); syncWipeInterval(r.hours); } } catch {}
+});
+
+(async () => {
+  if (!hasBridge) return;
+  try { const { hours } = await window.phantom.wipe.getInterval(); if (hours) syncWipeInterval(hours); } catch {}
+})();
+
+// Ghost mode
+function initGhostMode() {
+  if (!hasBridge) return;
+  window.phantom.privacy.onGhostMode(({ active }) => {
+    if (active) {
+      for (const [id] of tabs) closeTab(id);
+      document.body.classList.add('ghost-mode');
+      showToast('Ghost mode active. Session data cleared.');
+    }
+  });
+}
+
+// ── Security ──────────────────────────────────────────────────────────────────
+let blurDelayTimer    = null;   // fires to show the blur overlay
+let blurAutoLockTimer = null;   // fires to show PIN lock after blur is visible
+
+function showFocusBlur() {
+  const s = loadSettings();
+  const blurDelay = s.blurDelay;
+  if (blurDelay === 'disabled') return;            // blur fully disabled
+
+  clearTimeout(blurDelayTimer);
+  clearTimeout(blurAutoLockTimer);
+
+  const delaySec = Number(blurDelay);              // 0 = immediately
+
+  blurDelayTimer = setTimeout(() => {
+    if (hasBridge && activeTabId) { const t = tabs.get(activeTabId); if (t?.url) phantom.tabViews.hide(activeTabId); }
+    $('#focusBlurOverlay').classList.add('show');
+
+    // Now schedule the PIN lock
+    const lockSec = s.blackoutTimeout === 'disabled' ? 0 : Number(s.blackoutTimeout);
+    if (s.autoLock !== false && lockSec > 0) {
+      blurAutoLockTimer = setTimeout(() => {
+        if ($('#focusBlurOverlay').classList.contains('show')) {
+          lockScreenMode = true; pinBuffer = ''; updatePinDots(); $('#pinOverlay').classList.add('show');
+        }
+      }, lockSec * 1000);
+    }
+  }, delaySec * 1000);
+}
+
+function hideFocusBlur() {
+  clearTimeout(blurDelayTimer);
+  clearTimeout(blurAutoLockTimer);
+  $('#focusBlurOverlay').classList.remove('show');
+  if (hasBridge && activeTabId) { const t = tabs.get(activeTabId); if (t?.url) phantom.tabViews.show(activeTabId, getContentBounds()); }
+}
+
+function hideAllTabViews() {
+  if (!hasBridge) return;
+  for (const tab of tabs.values()) { if (tab.url) phantom.tabViews.hide(tab.id); }
+}
+
+function initSecurity() {
+  if (!hasBridge) return;
+  window.phantom.security.onLock(() => {
+    lockScreenMode = true; pinBuffer = ''; updatePinDots();
+    hideAllTabViews();
+    $('#focusBlurOverlay').classList.add('show');
+    $('#pinOverlay').classList.add('show');
+    setVaultMode('locked', 'Locked');
+  });
+  window.phantom.security.onFocus((focused) => { if (focused) hideFocusBlur(); else showFocusBlur(); });
+  const _s = loadSettings();
+  window.phantom.security.setContentProtection(_s.screenProtect !== false).catch(() => {});
+  window.phantom.warp?.onDnsProbe?.((result) => {
+    if (result?.possibleLeak) { const d = $('#warpDot'); if (d) d.style.background = 'var(--red)'; showToast('DNS leak detected — traffic may not be routed through VPN.', 6000); }
+  });
+  window.phantom.warp?.onKillSwitch?.((data) => {
+    if (data?.active) showToast('VPN kill-switch active — all traffic blocked until WARP reconnects.', 6000);
+  });
+}
+
+// ── Tab snapshot ──────────────────────────────────────────────────────────────
+let _snapshotDebounceTimer = null;
+function snapshotTabs() {
+  // Debounce — many events can fire in quick succession (navigate, title, load); batch into one write per 3s
+  clearTimeout(_snapshotDebounceTimer);
+  _snapshotDebounceTimer = setTimeout(_doSnapshotTabs, 3000);
+}
+function _doSnapshotTabs() {
+  if (!hasBridge) return;
+  const tabArr = [...tabs.values()].filter((t) => !t.forgetOnWipe).map((t) => ({ url: t.url || '', title: t.title || 'New Tab', container: t.container || 'default' }));
+  const activeIdx = Math.max(0, [...tabs.values()].findIndex((t) => t.id === activeTabId));
+  window.phantom.tabs.snapshot(tabArr, activeIdx);
+}
+
+async function restoreTabs() {
+  if (!hasBridge) return;
+  if (loadSettings().restoreTabs === false) return;
+  try {
+    const snap = await window.phantom.tabs.restore();
+    if (!snap?.tabs?.length) return;
+    for (const tab of tabs.values()) { tab.el?.remove(); }
+    tabs.clear(); activeTabId = null;
+    $('#webviewLayer').replaceChildren();
+    snap.tabs.forEach((t, i) => createTab({ title: t.title || 'Tab', url: t.url || '', container: t.container || 'default', active: i === (snap.activeIndex ?? 0) }));
+  } catch {}
+}
+
+// ── URL helpers ───────────────────────────────────────────────────────────────
+function normalizeAddress(input) {
+  const v = input.trim();
+  if (!v) return '';
+  if (/^(https?|file):\/\//i.test(v)) return v;
+  if (/^(localhost|127\.|10\.|192\.168\.|\[?::1\]?)/i.test(v)) return `http://${v}`;
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(v)) return `https://${v}`;
+  const engine = SEARCH_ENGINES[loadSettings().searchEngine] || DEFAULT_SEARCH_URL;
+  return `${engine}${encodeURIComponent(v)}`;
+}
+
+function titleFromUrl(url) {
+  try { return new URL(url).hostname.replace(/^www\./, '') || 'New Tab'; } catch { return 'New Tab'; }
+}
+
+function favText(title) { return (title.replace(/^https?:\/\//, '').trim()[0] || 'R').toUpperCase(); }
+function activeTab() { return tabs.get(activeTabId); }
+
+// ── Tab rendering ─────────────────────────────────────────────────────────────
+function renderTab(tab) {
+  const cls = ['tab'];
+  if (containerClasses[tab.container]) cls.push(containerClasses[tab.container]);
+  if (tab.id === activeTabId) cls.push('active');
+  tab.el.className = cls.join(' ');
+
+  const fav = document.createElement('span');
+  fav.className = 'favicon';
+  fav.style.background = typeof tab.color === 'string' && tab.color.startsWith('linear') ? 'var(--accent)' : (tab.color || 'var(--accent)');
+  fav.style.color = 'white';
+  fav.textContent = favText(tab.title);
+
+  const ttl = document.createElement('span');
+  ttl.className = 'title';
+  ttl.textContent = tab.loading ? 'Loading…' : tab.title;
+
+  const cls2 = document.createElement('span');
+  cls2.className = 'close';
+  cls2.textContent = '×';
+
+  tab.el.replaceChildren(fav, ttl, cls2);
+}
+
+// ── Tab context menu ──────────────────────────────────────────────────────────
+let _ctxTabId = null;
+
+function showTabContextMenu(tabId, x, y) {
+  _ctxTabId = tabId;
+  const tab = tabs.get(tabId);
+  const lbl = $('#ctxForgetLabel'); if (lbl && tab) lbl.textContent = tab.forgetOnWipe ? 'On' : 'Off';
+  const menu = $('#tabContextMenu');
+  menu.style.left = `${Math.min(x, window.innerWidth - 180)}px`;
+  menu.style.top  = `${Math.min(y, window.innerHeight - 220)}px`;
+  menu.classList.add('open');
+}
+
+function hideTabContextMenu() { $('#tabContextMenu').classList.remove('open'); _ctxTabId = null; }
+
+document.addEventListener('click', (e) => { if (!e.target.closest('#tabContextMenu')) hideTabContextMenu(); }, true);
+
+$$('#tabContextMenu [data-container]').forEach((item) => {
+  item.addEventListener('click', () => {
+    if (!_ctxTabId) return;
+    const tab = tabs.get(_ctxTabId);
+    if (!tab) return;
+    const nc = item.dataset.container;
+    if (nc === tab.container) { hideTabContextMenu(); return; }
+    if (hasBridge) window.phantom.wipe.container(tab.container).catch(() => {});
+    tab.container = nc;
+    if (tab.url) navigateTab(tab, tab.url);
+    renderTab(tab);
+    hideTabContextMenu();
+    showToast(`Moved to ${nc} container (old data wiped).`);
+  });
+});
+
+$('#ctxWipeContainer').addEventListener('click', () => {
+  if (!_ctxTabId) return;
+  const tab = tabs.get(_ctxTabId);
+  if (!tab) return;
+  if (hasBridge) window.phantom.wipe.container(tab.container).then(() => { showToast(`${tab.container} container wiped.`); if (tab.url) navigateTab(tab, tab.url); }).catch(() => {});
+  hideTabContextMenu();
+});
+
+$('#ctxForgetOnWipe').addEventListener('click', () => {
+  if (!_ctxTabId) return;
+  const tab = tabs.get(_ctxTabId);
+  if (!tab) return;
+  tab.forgetOnWipe = !tab.forgetOnWipe;
+  $('#ctxForgetLabel').textContent = tab.forgetOnWipe ? 'On' : 'Off';
+  snapshotTabs();
+  showToast(`Tab will ${tab.forgetOnWipe ? 'not be' : 'be'} restored after wipe.`);
+  hideTabContextMenu();
+});
+
+$('#ctxCloseTab').addEventListener('click', () => { if (_ctxTabId) closeTab(_ctxTabId); hideTabContextMenu(); });
+
+// ── Tab lifecycle ─────────────────────────────────────────────────────────────
+function createTab({ title = 'Dashboard', url = '', container = 'default', active = true } = {}) {
+  const id = `tab-${++tabSeq}`;
+  const el = document.createElement('div');
+  // Apply start page setting for new empty tabs
+  if (!url) {
+    const s = loadSettings();
+    if (s.startPage === 'custom' && s.customUrl) url = s.customUrl;
+  }
+  const tab = { id, title, url, container, el, webview: null, color: 'var(--accent)' };
+  tabs.set(id, tab);
+
+  el.addEventListener('click', (e) => {
+    if (e.target.classList.contains('close')) { closeTab(id); return; }
+    activateTab(id);
+  });
+  el.addEventListener('auxclick', (e) => { if (e.button === 1) { e.preventDefault(); closeTab(id); } });
+  el.addEventListener('contextmenu', (e) => { e.preventDefault(); showTabContextMenu(id, e.clientX, e.clientY); });
+
+  $('#tabBar').insertBefore(el, $('.tab-bar-end'));
+  renderTab(tab);
+  if (active) activateTab(id);
+  if (url) navigateTab(tab, url);
+  snapshotTabs();
+  return tab;
+}
+
+function getContentBounds() {
+  const el = $('#webviewLayer');
+  const r = el.getBoundingClientRect();
+  return { x: r.left, y: r.top, width: r.width, height: r.height };
+}
+
+function navigateTab(tab, rawUrl) {
+  const url = normalizeAddress(rawUrl);
+  if (!url) return;
+  if (!hasBridge) { showToast('Run npm start to browse inside Ram Browser.'); return; }
+  tab.url = url; tab.title = titleFromUrl(url); tab.loading = true;
+  renderTab(tab);
+  phantom.tabViews.navigate(tab.id, url, partitionByContainer[tab.container] || partitionByContainer.default);
+  activateTab(tab.id);
+}
+
+function navigateActive(rawUrl) {
+  let tab = activeTab();
+  if (!tab) tab = createTab({ active: true });
+  navigateTab(tab, rawUrl);
+}
+
+function activateTab(id) {
+  activeTabId = id;
+  const tab = activeTab();
+  if (!tab) return;
+  for (const item of tabs.values()) item.el.classList.toggle('active', item.id === id);
+  const browsing = Boolean(tab.url);
+  $('#dashboard').classList.toggle('hidden', browsing);
+  // container tag removed from toolbar in Safari redesign
+  updateToolbarForTab(tab);
+  if (!hasBridge) return;
+  const bounds = getContentBounds();
+  for (const item of tabs.values()) {
+    if (!item.url) continue;
+    if (item.id === id) phantom.tabViews.show(item.id, bounds);
+    else phantom.tabViews.hide(item.id);
+  }
+}
+
+// Keep WebContentsView bounds in sync when the window is resized
+if (hasBridge) {
+  new ResizeObserver(() => {
+    const tab = activeTab();
+    if (tab?.url) phantom.tabViews.show(tab.id, getContentBounds());
+  }).observe($('#webviewLayer'));
+}
+
+function updateToolbarForTab(tab) {
+  const ui = $('#urlInput'); if (ui) ui.value = tab.url || '';
+  const bb = $('#btnBack'); if (bb) bb.classList.toggle('active', Boolean(tab.canGoBack));
+  const bf = $('#btnForward'); if (bf) bf.classList.toggle('active', Boolean(tab.canGoForward));
+  $('#urlCapsule')?.classList.toggle('loading', Boolean(tab.loading));
+}
+
+function closeTab(id) {
+  const tab = tabs.get(id);
+  if (!tab) return;
+  if (tab.url && hasBridge) phantom.tabViews.close(tab.id);
+  tab.el.remove();
+  tabs.delete(id);
+  if (activeTabId === id) {
+    const next = [...tabs.values()].at(-1) || createTab({ active: false });
+    activateTab(next.id);
+  }
+  snapshotTabs();
+}
+
+function resetToDashboard() {
+  for (const tab of tabs.values()) { if (tab.url && hasBridge) phantom.tabViews.close(tab.id); tab.el?.remove(); }
+  tabs.clear(); activeTabId = null;
+  createTab({ title: 'Dashboard', active: true });
+}
+
+// ── WebContentsView events ────────────────────────────────────────────────────
+if (hasBridge) {
+  phantom.tabViews.onNavigated(({ tabId, url, canGoBack, canGoForward }) => {
+    const tab = tabs.get(tabId); if (!tab) return;
+    tab.url = url; tab.canGoBack = canGoBack; tab.canGoForward = canGoForward;
+    renderTab(tab); if (tabId === activeTabId) updateToolbarForTab(tab); snapshotTabs();
+  });
+  phantom.tabViews.onTitleUpdated(({ tabId, title }) => {
+    const tab = tabs.get(tabId); if (!tab) return;
+    tab.title = title || titleFromUrl(tab.url); renderTab(tab);
+  });
+  phantom.tabViews.onLoadChange(({ tabId, loading, url, title, canGoBack, canGoForward }) => {
+    const tab = tabs.get(tabId); if (!tab) return;
+    tab.loading = loading; if (url) tab.url = url; if (title) tab.title = title;
+    if (canGoBack !== undefined) tab.canGoBack = canGoBack;
+    if (canGoForward !== undefined) tab.canGoForward = canGoForward;
+    renderTab(tab); if (tabId === activeTabId) updateToolbarForTab(tab);
+    if (!loading) snapshotTabs();
+  });
+  phantom.tabViews.onFailLoad(({ tabId, errorCode, errorDescription }) => {
+    const tab = tabs.get(tabId); if (!tab) return;
+    tab.title = 'Load error'; tab.loading = false; renderTab(tab);
+    showToast(`[${errorCode}] ${errorDescription}`);
+  });
+}
+
+// ── Toolbar button handlers ───────────────────────────────────────────────────
+$('#tabBarNewBtn').addEventListener('click', () => { createTab({ active: true }); $('#urlInput').focus(); });
+
+$('#urlInput').addEventListener('focus', () => { $('#urlInput').select(); });
+$('#urlInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { navigateActive(e.currentTarget.value); e.currentTarget.blur(); }
+  if (e.key === 'Escape') {
+    const t = activeTab();
+    e.currentTarget.value = t?.url || '';
+    e.currentTarget.blur();
+  }
+});
+
+$('#dashboardSearch').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { navigateActive(e.currentTarget.value); e.currentTarget.value = ''; }
+});
+
+$('#btnBack').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.goBack(t.id); });
+$('#btnForward').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.goForward(t.id); });
+$('#btnReload').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.reload(t.id); });
+
+$('#btnClose').addEventListener('click', () => window.phantom?.window?.close());
+$('#btnMin').addEventListener('click', () => window.phantom?.window?.minimize());
+$('#btnMax').addEventListener('click', () => window.phantom?.window?.toggleMaximize());
+
+
+$('#screenshotPanelBtn').addEventListener('click', () => { closeAllPopovers(); takeScreenshot(); });
+
+
+$('#warpPill')?.addEventListener('click', (e) => { e.stopPropagation(); showToast('VPN status unavailable'); });
+
+// ── Panic ─────────────────────────────────────────────────────────────────────
+function triggerPanic() {
+  window.phantom?.privacy?.panic?.().catch(() => {});
+  resetToDashboard();
+  toggleMessaging(false);
+  closeAllPopovers();
+  hideFocusBlur();
+  const pb = $('#btnPanic'); if (pb) { pb.style.background = ''; pb.style.color = ''; }
+  panicClicks = 0;
+}
+
+$('#btnPanic').addEventListener('click', () => {
+  panicClicks++;
+  if (panicClicks === 1) {
+    $('#btnPanic').style.background = 'rgba(255,69,58,0.16)';
+    $('#btnPanic').style.color = 'var(--red)';
+    setTimeout(() => { $('#btnPanic').style.background = ''; $('#btnPanic').style.color = ''; panicClicks = 0; }, 1200);
+    return;
+  }
+  panicClicks = 0;
+  triggerPanic();
+});
+
+
+// ── WARP status ───────────────────────────────────────────────────────────────
+function proxyHost(url) {
+  try { const u = new URL(url); return `${u.protocol.replace(':','')} · ${u.host}`; } catch { return url; }
+}
+
+function applyWarpStatus(status) {
+  const connected = status.connected;
+  const blocked   = status.enforced && !connected;
+  const color     = blocked ? 'var(--red)' : connected ? 'var(--green)' : 'var(--yellow)';
+  const shortLabel = connected ? proxyHost(status.proxyUrl || '') : blocked ? 'Blocked' : 'Not connected';
+  const detailLabel = connected
+    ? (status.proxyUrl || 'Proxy active')
+    : blocked ? 'Kill switch active — traffic blocked' : 'No proxy configured';
+
+  const pill = $('#warpPill');
+  if (pill) {
+    pill.classList.toggle('err',  blocked);
+    pill.classList.toggle('warn', !connected && !blocked);
+    pill.dataset.tip = detailLabel;
+  }
+  const ld = $('#warpLatency');  if (ld) ld.textContent = shortLabel;
+  const dv = $('#dashVpn');      if (dv) dv.textContent = connected ? 'Active' : blocked ? 'Blocked' : 'Off';
+  const mv = $('#metricVpn');    if (mv) { mv.textContent = connected ? 'Connected' : blocked ? 'Blocked' : 'Off'; mv.className = `metric-value ${connected ? 'green' : blocked ? 'red' : ''}`; }
+  const md = $('#metricVpnDetail'); if (md) md.textContent = detailLabel;
+  const sw = $('#statusWarp');   if (sw) sw.textContent = `VPN: ${shortLabel}`;
+  const sd = $('#statusWarpDot'); if (sd) sd.style.background = color;
+  const wd = $('#warpDot');       if (wd) wd.style.background = color;
+
+  // Update VPN settings panel status badge if open
+  const badge = $('#vpnStatusBadge');
+  if (badge) {
+    badge.textContent = connected ? `● Connected · ${status.proxyUrl || ''}` : blocked ? '● Blocked (kill switch)' : '● Not connected';
+    badge.style.color = color;
+  }
+}
+
+window.phantom?.warp?.getStatus?.().then(applyWarpStatus).catch(() => {});
+window.phantom?.warp?.onStatus?.(applyWarpStatus);
+
+window.phantom?.privacy?.onPanic?.(() => triggerPanic());
+window.phantom?.browser?.onNewTabRequest?.((url) => { const t = createTab({ title: titleFromUrl(url), active: true }); navigateTab(t, url); });
+
+// ── Menu bar IPC (from main process custom menu) ───────────────────────────
+window.phantom?.menu?.onNewTab?.(() => { createTab({ active: true }); $('#urlInput')?.focus(); });
+window.phantom?.menu?.onCloseTab?.(() => { if (activeTabId) closeTab(activeTabId); });
+window.phantom?.menu?.onReload?.(() => { const t = activeTab(); if (t?.url) phantom?.tabViews?.reload?.(t.id); });
+window.phantom?.menu?.onBack?.(() => { const t = activeTab(); if (t) phantom?.tabViews?.goBack?.(t.id); });
+window.phantom?.menu?.onForward?.(() => { const t = activeTab(); if (t) phantom?.tabViews?.goForward?.(t.id); });
+window.phantom?.menu?.onPanic?.(() => triggerPanic());
+window.phantom?.menu?.onLock?.(() => { lockScreenMode = true; $('#pinOverlay').classList.add('show'); });
+window.phantom?.menu?.onPrivacy?.(() => { const p = $('#privacyPanel'); if (p.classList.contains('open')) closeAllPopovers(); else openPopover(p); });
+window.phantom?.menu?.onScreenshot?.(() => takeScreenshot());
+window.phantom?.menu?.onSettings?.(() => openSettings());
+window.phantom?.menu?.onFocusUrl?.(() => { const u = $('#urlInput'); if (u) { u.focus(); u.select(); } });
+window.phantom?.menu?.onFind?.(() => openFindBar());
+window.phantom?.menu?.onZoomIn?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomIn?.(t.id); });
+window.phantom?.menu?.onZoomOut?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomOut?.(t.id); });
+window.phantom?.menu?.onZoomReset?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomReset?.(t.id); });
+
+// ── Find bar ──────────────────────────────────────────────────────────────────
+function openFindBar() {
+  const bar = $('#findBar'); if (!bar) return;
+  bar.classList.add('open');
+  const inp = $('#findInput'); if (inp) { inp.focus(); inp.select(); }
+  // Resize active tab to make room for the find bar
+  const t = activeTab();
+  if (t?.url && hasBridge) window.phantom?.tabViews?.show?.(t.id, getContentBounds());
+}
+
+function closeFindBar() {
+  const bar = $('#findBar'); if (!bar) return;
+  bar.classList.remove('open');
+  const inp = $('#findInput');
+  if (inp) { inp.value = ''; inp.classList.remove('no-match'); }
+  $('#findCount').textContent = '';
+  const t = activeTab();
+  if (t?.url && hasBridge) {
+    window.phantom?.tabViews?.stopFind?.(t.id);
+    window.phantom?.tabViews?.show?.(t.id, getContentBounds());
+  }
+}
+
+function runFind(forward = true) {
+  const text = $('#findInput')?.value?.trim() || '';
+  const t = activeTab();
+  if (!t?.url || !hasBridge) return;
+  if (!text) { window.phantom?.tabViews?.stopFind?.(t.id); $('#findCount').textContent = ''; return; }
+  window.phantom?.tabViews?.find?.(t.id, text, forward);
+}
+
+$('#findInput')?.addEventListener('input', () => {
+  $('#findInput').classList.remove('no-match');
+  runFind(true);
+});
+$('#findInput')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { runFind(!e.shiftKey); e.preventDefault(); }
+  if (e.key === 'Escape') { closeFindBar(); }
+});
+$('#findNext')?.addEventListener('click', () => runFind(true));
+$('#findPrev')?.addEventListener('click', () => runFind(false));
+$('#findClose')?.addEventListener('click', () => closeFindBar());
+
+window.phantom?.tabViews?.onFindResult?.((data) => {
+  const count = $('#findCount');
+  const inp = $('#findInput');
+  if (!count || !inp) return;
+  if (data.matches === 0) {
+    count.textContent = 'No results';
+    inp.classList.add('no-match');
+  } else {
+    count.textContent = `${data.activeMatchOrdinal} / ${data.matches}`;
+    inp.classList.remove('no-match');
+  }
+});
+
+// ── Downloads toast ───────────────────────────────────────────────────────────
+window.phantom?.downloads?.onStart?.((data) => {
+  showToast(`Downloading: ${data.filename}`);
+});
+window.phantom?.downloads?.onDone?.((data) => {
+  if (data.state === 'completed') showToast(`Downloaded: ${data.filename}`);
+  else if (data.state === 'cancelled') showToast(`Download cancelled: ${data.filename}`);
+  else showToast(`Download failed: ${data.filename}`);
+});
+
+
+
+// ── Safe screenshot ───────────────────────────────────────────────────────────
+let _screenshotDataUrl = null;
+let _screenshotCropRegion = null;
+const _blurBoxes = [];
+
+function applyScreenshotRedactions(canvas, ctx) {
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fillRect(0, 0, canvas.width, 48);           // toolbar
+  ctx.fillStyle = '#3a3a3c';
+  ctx.fillRect(80, 8, canvas.width - 200, 32);    // url capsule area
+  ctx.fillStyle = 'rgba(245,245,247,0.42)';
+  ctx.font = '13px -apple-system, sans-serif';
+  ctx.fillText('Private Browser', 100, 29);
+  ctx.fillStyle = '#1c1c1e';
+  ctx.fillRect(0, canvas.height - 24, canvas.width, 24); // statusbar
+  ctx.fillStyle = 'rgba(245,245,247,0.28)';
+  ctx.font = '10px -apple-system, sans-serif';
+  ctx.fillText('Protected', 10, canvas.height - 8);
+}
+
+async function captureAndShow() {
+  try {
+    const captured = await window.phantom.security.captureScreen();
+    if (!captured?.dataUrl) { showToast('Capture failed.'); return; }
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = captured.dataUrl; });
+    const dpr = window.devicePixelRatio || 1;
+    const r = _screenshotCropRegion;
+    const sx = r ? r.x * dpr : 0, sy = r ? r.y * dpr : 0;
+    const sw = r ? r.w * dpr : img.naturalWidth, sh = r ? r.h * dpr : img.naturalHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = sw; canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+    if (!r) applyScreenshotRedactions(canvas, ctx);
+    _screenshotDataUrl = canvas.toDataURL('image/png');
+    _blurBoxes.length = 0;
+    $('#screenshotImg').src = _screenshotDataUrl;
+    $('#screenshotPreview').style.display = 'flex';
+    $('#screenshotImg').onload = () => _renderBlurBoxes();
+  } catch (err) { showToast('Screenshot error: ' + err.message); }
+}
+
+function _renderBlurBoxes() {
+  const canvas = $('#blurOverlayCanvas'), img = $('#screenshotImg');
+  if (!canvas || !img) return;
+  canvas.width = img.offsetWidth; canvas.height = img.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const sx = canvas.width / (img.naturalWidth || canvas.width);
+  const sy = canvas.height / (img.naturalHeight || canvas.height);
+  for (const box of _blurBoxes) {
+    ctx.fillStyle = 'rgba(30,30,30,0.6)';
+    ctx.fillRect(box.x * sx, box.y * sy, box.w * sx, box.h * sy);
+    ctx.strokeStyle = 'var(--accent)'; ctx.lineWidth = 1.5;
+    ctx.strokeRect(box.x * sx + 0.5, box.y * sy + 0.5, box.w * sx - 1, box.h * sy - 1);
+  }
+}
+
+(function initBlurDraw() {
+  const canvas = $('#blurOverlayCanvas');
+  if (!canvas) return;
+  let drag = false, sx = 0, sy = 0;
+  canvas.addEventListener('mousedown', (e) => { drag = true; sx = e.offsetX; sy = e.offsetY; e.preventDefault(); });
+  canvas.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    _renderBlurBoxes();
+    const ctx = canvas.getContext('2d');
+    const x = Math.min(e.offsetX, sx), y = Math.min(e.offsetY, sy);
+    ctx.strokeStyle = 'rgba(167,139,250,0.8)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]); ctx.strokeRect(x, y, Math.abs(e.offsetX - sx), Math.abs(e.offsetY - sy)); ctx.setLineDash([]);
+  });
+  canvas.addEventListener('mouseup', (e) => {
+    if (!drag) return; drag = false;
+    const img = $('#screenshotImg'); if (!img) return;
+    const w = Math.abs(e.offsetX - sx), h = Math.abs(e.offsetY - sy);
+    if (w > 8 && h > 8) {
+      _blurBoxes.push({ x: Math.min(e.offsetX, sx) * (img.naturalWidth / canvas.width), y: Math.min(e.offsetY, sy) * (img.naturalHeight / canvas.height), w: w * (img.naturalWidth / canvas.width), h: h * (img.naturalHeight / canvas.height) });
+    }
+    _renderBlurBoxes();
+  });
+})();
+
+function applyBlurBoxesToImage() {
+  if (!_screenshotDataUrl || !_blurBoxes.length) return;
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas'); canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
+    for (const box of _blurBoxes) {
+      ctx.save(); ctx.filter = 'blur(12px)'; ctx.drawImage(img, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); ctx.restore();
+      ctx.save(); ctx.filter = 'blur(8px)'; ctx.drawImage(canvas, box.x, box.y, box.w, box.h, box.x, box.y, box.w, box.h); ctx.restore();
+    }
+    _screenshotDataUrl = canvas.toDataURL('image/png');
+    $('#screenshotImg').src = _screenshotDataUrl;
+    _blurBoxes.length = 0; _renderBlurBoxes(); showToast('Blur applied.');
+  };
+  img.src = _screenshotDataUrl;
+}
+
+$('#screenshotApplyBlurBtn')?.addEventListener('click', applyBlurBoxesToImage);
+$('#screenshotClearBlurBtn')?.addEventListener('click', () => { _blurBoxes.length = 0; _renderBlurBoxes(); });
+
+(function initScreenshotOverlay() {
+  const overlay = $('#screenshotOverlay'), selBox = $('#screenshotSelection');
+  if (!overlay || !selBox) return;
+  let drag = false, ox = 0, oy = 0;
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return; drag = true; ox = e.clientX; oy = e.clientY;
+    selBox.style.display = 'block'; selBox.style.left = ox + 'px'; selBox.style.top = oy + 'px'; selBox.style.width = '0'; selBox.style.height = '0';
+    e.preventDefault();
+  });
+  overlay.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    selBox.style.left = Math.min(e.clientX, ox) + 'px'; selBox.style.top = Math.min(e.clientY, oy) + 'px';
+    selBox.style.width = Math.abs(e.clientX - ox) + 'px'; selBox.style.height = Math.abs(e.clientY - oy) + 'px';
+  });
+  overlay.addEventListener('mouseup', async (e) => {
+    if (!drag) return; drag = false;
+    const w = Math.abs(e.clientX - ox), h = Math.abs(e.clientY - oy);
+    overlay.style.display = 'none'; selBox.style.display = 'none';
+    _screenshotCropRegion = (w > 10 && h > 10) ? { x: Math.min(e.clientX, ox), y: Math.min(e.clientY, oy), w, h } : null;
+    await captureAndShow();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (overlay.style.display !== 'flex') return;
+    if (e.key === 'Escape') { drag = false; overlay.style.display = 'none'; selBox.style.display = 'none'; }
+    else if (e.key === 'Enter') { e.preventDefault(); drag = false; overlay.style.display = 'none'; selBox.style.display = 'none'; _screenshotCropRegion = null; captureAndShow(); }
+  });
+})();
+
+function takeScreenshot() {
+  if (!hasBridge) { showToast('Screenshot requires Electron bridge.'); return; }
+  _screenshotCropRegion = null;
+  const overlay = $('#screenshotOverlay');
+  if (overlay) overlay.style.display = 'flex'; else captureAndShow();
+}
+
+$('#screenshotSaveBtn')?.addEventListener('click', async () => {
+  if (!_screenshotDataUrl) return;
+  const r = await window.phantom.security.saveScreenshot(_screenshotDataUrl);
+  showToast(r?.ok ? 'Screenshot saved.' : 'Save cancelled.');
+  $('#screenshotPreview').style.display = 'none';
+});
+$('#screenshotCopyBtn')?.addEventListener('click', async () => {
+  if (!_screenshotDataUrl) return;
+  try {
+    const blob = await (await fetch(_screenshotDataUrl)).blob();
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    showToast('Screenshot copied to clipboard.');
+  } catch { showToast('Could not copy to clipboard.'); }
+  $('#screenshotPreview').style.display = 'none';
+});
+$('#screenshotCancelBtn')?.addEventListener('click', () => { $('#screenshotPreview').style.display = 'none'; _screenshotDataUrl = null; _blurBoxes.length = 0; });
+
+document.addEventListener('keydown', (e) => {
+  const cmd = e.ctrlKey || e.metaKey;
+
+  // Screenshot
+  if (cmd && e.shiftKey && e.key === 'S') {
+    if ($('#screenshotOverlay')?.style.display === 'flex') return;
+    e.preventDefault(); takeScreenshot();
+  }
+
+  // Settings
+  if (cmd && e.key === ',') { e.preventDefault(); const sv = $('#settingsView'); if (sv?.classList.contains('open')) closeSettings(); else openSettings(); }
+  if (e.key === 'Escape' && $('#settingsView')?.classList.contains('open')) { closeSettings(); }
+
+  // Cmd+L — focus URL bar
+  if (cmd && e.key === 'l') { e.preventDefault(); const u = $('#urlInput'); if (u) { u.focus(); u.select(); } }
+
+  // Cmd+F — open find bar
+  if (cmd && e.key === 'f') {
+    // Only intercept when not typing in an input inside settings/panel
+    if (document.activeElement?.closest?.('#settingsView, .popover, .glass-popover')) return;
+    e.preventDefault(); openFindBar();
+  }
+
+  // Cmd+1-9 — switch to tab by index
+  if (cmd && !e.shiftKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+    const tabEls = $$('.tab');
+    const idx = parseInt(e.key) - 1;
+    if (idx < tabEls.length) { e.preventDefault(); tabEls[idx].click(); }
+  }
+
+  // Cmd+Option+Left/Right — previous/next tab
+  if (cmd && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+    e.preventDefault();
+    const tabEls = [...$$('.tab')];
+    const cur = tabEls.findIndex((t) => t.classList.contains('active'));
+    if (cur === -1) return;
+    const next = e.key === 'ArrowRight' ? (cur + 1) % tabEls.length : (cur - 1 + tabEls.length) % tabEls.length;
+    tabEls[next]?.click();
+  }
+
+  // Zoom shortcuts — only when a URL tab is active
+  if (cmd && !e.shiftKey && !e.altKey && hasBridge) {
+    const t = activeTab();
+    if (t?.url) {
+      if (e.key === '=' || e.key === '+') { e.preventDefault(); window.phantom?.tabViews?.zoomIn?.(t.id); }
+      if (e.key === '-') { e.preventDefault(); window.phantom?.tabViews?.zoomOut?.(t.id); }
+      if (e.key === '0') { e.preventDefault(); window.phantom?.tabViews?.zoomReset?.(t.id); }
+    }
+  }
+});
+
+// ── Dashboard widget customise ────────────────────────────────────────────────
+const WIDGET_MAP = {
+  wVpn: '[data-widget="vpn"]', wWipe: '[data-widget="wipe"]',
+  wContainers: '[data-widget="containers"]', wVault: '[data-widget="vault"]',
+  wPrivacyReport: '[data-widget="privacy-report"]'
+};
+let _widgetPrefs = {};
+
+function applyWidgetVisibility(prefs) {
+  for (const [key, sel] of Object.entries(WIDGET_MAP)) {
+    const el = document.querySelector(sel); if (el) el.dataset.widgetHidden = prefs[key] === false ? 'true' : 'false';
+    const cb = document.getElementById(key); if (cb) cb.checked = prefs[key] !== false;
+  }
+}
+function saveWidgetPrefs() {
+  if (!hasBridge || !currentProfile?.uuid) return;
+  window.phantom.profiles.update(currentProfile.uuid, { dashboardWidgets: _widgetPrefs }).catch(() => {});
+}
+async function loadWidgetPrefs() {
+  if (!hasBridge || !currentProfile?.uuid) return;
+  try {
+    const prefs = await window.phantom.profiles.getPrefs(currentProfile.uuid);
+    _widgetPrefs = prefs?.dashboardWidgets || {};
+    applyWidgetVisibility(_widgetPrefs);
+  } catch {}
+}
+for (const key of Object.keys(WIDGET_MAP)) {
+  document.getElementById(key)?.addEventListener('change', (e) => { _widgetPrefs[key] = e.target.checked; applyWidgetVisibility(_widgetPrefs); saveWidgetPrefs(); });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Settings ──────────────────────────────────────────────────────────────────
+const SETTINGS_KEY = 'ram:settings';
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}'); } catch { return {}; }
+}
+function saveSettings(patch) {
+  const s = { ...loadSettings(), ...patch };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  return s;
+}
+
+function openSettings() {
+  // Hide all native WebContentsViews — they sit above HTML and ignore z-index
+  if (hasBridge) {
+    for (const tab of tabs.values()) {
+      if (tab.url) window.phantom?.tabViews?.hide?.(tab.id);
+    }
+  }
+  $('#settingsView').classList.add('open');
+  applySettingsToUI();
+}
+function closeSettings() {
+  $('#settingsView').classList.remove('open');
+  // Wait for the browser to paint the settings-hidden state before restoring
+  // the native WebContentsView, otherwise a ghost frame of the settings page
+  // flashes through the compositing layer.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (activeTabId) activateTab(activeTabId);
+  }));
+}
+
+function applySettingsToUI() {
+  const s = loadSettings();
+  const set = (id, val, prop = 'checked') => { const el = $(id); if (el) el[prop] = val; };
+
+  // General
+  set('#sPanicVisible',   s.panicVisible  !== false);
+  set('#sTheme',          s.theme         || 'system', 'value');
+  set('#sSearchEngine',   s.searchEngine  || 'ddg', 'value');
+  set('#sStartPage',      s.startPage     || 'dashboard', 'value');
+  set('#sCustomUrl',     s.customUrl     || '', 'value');
+  set('#sRestoreTabs',   s.restoreTabs   !== false);
+  const cur = s.startPage || 'dashboard';
+  const urlRow = $('#sCustomUrlRow'); if (urlRow) urlRow.style.display = cur === 'custom' ? '' : 'none';
+
+  // Security
+  set('#sPinAttempts',       String(s.pinAttempts || 5), 'value');
+  set('#sAutoLock',          s.autoLock !== false);
+  set('#sBlurDelay',         s.blurDelay       != null ? String(s.blurDelay)       : '300',      'value');
+  set('#sBlackoutTimeout',   s.blackoutTimeout != null ? String(s.blackoutTimeout) : '120',      'value');
+  set('#sScreenProtect',     s.screenProtect !== false);
+
+  // Privacy
+  set('#sWipeInterval',    String(s.wipeInterval || 24), 'value');
+  set('#sWipeOnQuit',      !!s.wipeOnQuit);
+  set('#sReportReset',     s.reportReset !== false);
+  set('#sTrackerBlock',    s.trackerBlock !== false);
+  set('#sHttpsOnly',       s.httpsOnly !== false);
+  set('#sLinkSanitiser',   s.linkSanitiser !== false);
+  set('#sRedirectBlock',   s.redirectBlock !== false);
+
+  // VPN
+  set('#sTorEnabled',    s.torEnabled === true);
+  set('#sRequireVpn',    s.requireVpn === true);
+  set('#sShowLatency',   s.showLatency !== false);
+
+  // Vault
+  set('#sVaultDefault',  s.vaultDefault  || 'locked', 'value');
+  set('#sVaultDuration', String(s.vaultDuration || 300), 'value');
+
+  // Apply live effects
+  applyLiveSettings(s);
+}
+
+function applyLiveSettings(s) {
+  // Panic button visibility
+  const pb = $('#btnPanic'); if (pb) pb.style.display = s.panicVisible === false ? 'none' : '';
+  // WARP latency display
+  const ld = $('#warpLatency'); if (ld) ld.style.display = s.showLatency === false ? 'none' : '';
+  // PIN panic threshold
+  PIN_PANIC_THRESHOLD = Number(s.pinAttempts) || 5;
+  // Push toggleable flags to main process
+  if (hasBridge) {
+    window.phantom?.settings?.setWipeOnQuit?.(!!s.wipeOnQuit);
+    window.phantom?.settings?.setRequireVpn?.(s.requireVpn === true);
+    window.phantom?.settings?.setTrackerBlock?.(s.trackerBlock !== false);
+    window.phantom?.settings?.setHttpsOnly?.(s.httpsOnly !== false);
+    window.phantom?.settings?.setLinkSanitiser?.(s.linkSanitiser !== false);
+    window.phantom?.settings?.setRedirectBlock?.(s.redirectBlock !== false);
+  }
+}
+
+function initSettings() {
+  // Nav switching
+  $$('.settings-nav-item').forEach((item) => {
+    item.addEventListener('click', () => {
+      $$('.settings-nav-item').forEach((i) => i.classList.remove('active'));
+      $$('.settings-section').forEach((s) => s.classList.remove('active'));
+      item.classList.add('active');
+      const sec = $(`#s-${item.dataset.section}`);
+      if (sec) sec.classList.add('active');
+    });
+  });
+
+  // Open button (toolbar gear icon)
+  $('#btnSettings')?.addEventListener('click', () => openSettings());
+
+  // Close button
+  $('#settingsClose')?.addEventListener('click', closeSettings);
+
+  // ── General ──
+  $('#sPanicVisible')?.addEventListener('change', (e) => { saveSettings({ panicVisible: e.target.checked }); applyLiveSettings(loadSettings()); });
+  $('#sTheme')?.addEventListener('change', (e) => { saveSettings({ theme: e.target.value }); });
+  $('#sSearchEngine')?.addEventListener('change', (e) => { saveSettings({ searchEngine: e.target.value }); });
+  $('#sStartPage')?.addEventListener('change', (e) => {
+    saveSettings({ startPage: e.target.value });
+    const r = $('#sCustomUrlRow'); if (r) r.style.display = e.target.value === 'custom' ? '' : 'none';
+  });
+  $('#sCustomUrl')?.addEventListener('change', (e) => saveSettings({ customUrl: e.target.value }));
+  $('#sRestoreTabs')?.addEventListener('change', (e) => saveSettings({ restoreTabs: e.target.checked }));
+
+  // ── Security ──
+  $('#sPinAttempts')?.addEventListener('change', (e) => saveSettings({ pinAttempts: Number(e.target.value) }));
+  $('#sAutoLock')?.addEventListener('change', (e) => saveSettings({ autoLock: e.target.checked }));
+  $('#sBlurDelay')?.addEventListener('change', (e) => saveSettings({ blurDelay: e.target.value }));
+  $('#sBlackoutTimeout')?.addEventListener('change', (e) => saveSettings({ blackoutTimeout: e.target.value }));
+  $('#sScreenProtect')?.addEventListener('change', (e) => {
+    saveSettings({ screenProtect: e.target.checked });
+    window.phantom?.security?.setContentProtection?.(e.target.checked);
+  });
+
+  // PIN change
+  $('#sPinSaveBtn')?.addEventListener('click', async () => {
+    const cur = $('#sPinCurrent')?.value;
+    const nw  = $('#sPinNew')?.value;
+    const cf  = $('#sPinConfirm')?.value;
+    if (!nw) return showToast('Enter a new PIN.');
+    if (nw !== cf)   return showToast('New PINs do not match.');
+    if (nw.length < 4) return showToast('PIN must be at least 4 digits.');
+    if (!hasBridge)  return showToast('Run npm start to save PIN.');
+    try {
+      // If profile already has a PIN, verify the current one first
+      if (currentProfile?.hasPin) {
+        if (!cur) return showToast('Enter your current PIN to change it.');
+        const v = await window.phantom.pin.verify(currentProfile?.uuid, cur);
+        if (v !== 'valid') return showToast('Current PIN is incorrect.');
+      }
+      await window.phantom.pin.set(currentProfile?.uuid, nw);
+      ['#sPinCurrent','#sPinNew','#sPinConfirm'].forEach((id) => { const el = $(id); if (el) el.value = ''; });
+      showToast('PIN updated successfully.');
+    } catch (err) { showToast(err.message); }
+  });
+
+  // Decoy PIN change
+  $('#sDecoyPinSaveBtn')?.addEventListener('click', async () => {
+    const cur = $('#sDecoyPinCurrent')?.value;
+    const nw  = $('#sDecoyPinNew')?.value;
+    const cf  = $('#sDecoyPinConfirm')?.value;
+    if (!cur || !nw) return showToast('Enter current PIN and new decoy PIN.');
+    if (nw !== cf)   return showToast('Decoy PINs do not match.');
+    if (nw.length < 4) return showToast('Decoy PIN must be at least 4 digits.');
+    if (!hasBridge)  return showToast('Run npm start to save PIN.');
+    try {
+      const v = await window.phantom.pin.verify(currentProfile?.uuid, cur);
+      if (v !== 'valid') return showToast('Current PIN is incorrect.');
+      await window.phantom.pin.setDecoy(currentProfile?.uuid, nw);
+      ['#sDecoyPinCurrent','#sDecoyPinNew','#sDecoyPinConfirm'].forEach((id) => { const el = $(id); if (el) el.value = ''; });
+      showToast('Decoy PIN updated successfully.');
+    } catch (err) { showToast(err.message); }
+  });
+
+  // ── Privacy ──
+  $('#sWipeInterval')?.addEventListener('change', (e) => {
+    const h = Number(e.target.value);
+    saveSettings({ wipeInterval: h });
+    window.phantom?.wipe?.setInterval?.(h);
+  });
+  $('#sWipeOnQuit')?.addEventListener('change', (e) => {
+    saveSettings({ wipeOnQuit: e.target.checked });
+    window.phantom?.settings?.setWipeOnQuit?.(e.target.checked);
+  });
+  $('#sReportReset')?.addEventListener('change', (e) => saveSettings({ reportReset: e.target.checked }));
+  $('#sTrackerBlock')?.addEventListener('change', (e) => {
+    saveSettings({ trackerBlock: e.target.checked });
+    window.phantom?.settings?.setTrackerBlock?.(e.target.checked);
+  });
+  $('#sHttpsOnly')?.addEventListener('change', (e) => {
+    saveSettings({ httpsOnly: e.target.checked });
+    window.phantom?.settings?.setHttpsOnly?.(e.target.checked);
+  });
+  $('#sLinkSanitiser')?.addEventListener('change', (e) => {
+    saveSettings({ linkSanitiser: e.target.checked });
+    window.phantom?.settings?.setLinkSanitiser?.(e.target.checked);
+  });
+  $('#sRedirectBlock')?.addEventListener('change', (e) => {
+    saveSettings({ redirectBlock: e.target.checked });
+    window.phantom?.settings?.setRedirectBlock?.(e.target.checked);
+  });
+  $('#sWipeNowBtn')?.addEventListener('click', async () => {
+    try { await window.phantom?.wipe?.triggerNow?.(); showToast('Session wiped.'); } catch (err) { showToast(err?.message || 'Wipe failed.'); }
+  });
+
+  // ── VPN ──
+  $('#sTorEnabled')?.addEventListener('change', async (e) => {
+    saveSettings({ torEnabled: e.target.checked });
+    if (e.target.checked) {
+      const r = await window.phantom?.warp?.enableTor?.().catch(() => ({ ok: false }));
+      if (r?.ok) showToast('Tor routing active — all traffic routed through Tor.');
+      else showToast('Tor not available. Start Tor Browser or system Tor first.', 5000);
+    } else {
+      await window.phantom?.warp?.disableTor?.().catch(() => {});
+      showToast('Tor routing disabled.');
+    }
+  });
+  $('#sRequireVpn')?.addEventListener('change', (e) => {
+    saveSettings({ requireVpn: e.target.checked });
+    window.phantom?.settings?.setRequireVpn?.(e.target.checked);
+  });
+  $('#sShowLatency')?.addEventListener('change', (e) => saveSettings({ showLatency: e.target.checked }));
+
+  // Load current proxy URL into input when settings opens
+  window.phantom?.warp?.getProxy?.().then(({ url }) => {
+    if (url && $('#sProxyUrl')) $('#sProxyUrl').value = url;
+  }).catch(() => {});
+
+  $('#sVpnConnect')?.addEventListener('click', async () => {
+    if (!hasBridge) { showToast('Run npm start to use VPN.'); return; }
+    const url = $('#sProxyUrl')?.value?.trim();
+    if (!url) { showToast('Enter a proxy URL.'); return; }
+    const btn = $('#sVpnConnect');
+    btn.textContent = 'Connecting…'; btn.disabled = true;
+    try {
+      const r = await window.phantom.warp.setProxy(url);
+      if (r.ok) {
+        showToast('Proxy connected.');
+        const s = await window.phantom.warp.getStatus();
+        applyWarpStatus(s);
+      } else { showToast('Failed: ' + r.error); }
+    } catch (err) { showToast(err.message); }
+    btn.textContent = 'Connect'; btn.disabled = false;
+  });
+
+  $('#sVpnDisconnect')?.addEventListener('click', async () => {
+    if (!hasBridge) return;
+    await window.phantom.warp.disconnect().catch(() => {});
+    if ($('#sProxyUrl')) $('#sProxyUrl').value = '';
+    if ($('#vpnTestResult')) $('#vpnTestResult').textContent = '';
+    showToast('Proxy disconnected.');
+    const s = await window.phantom.warp.getStatus().catch(() => ({}));
+    if (s) applyWarpStatus(s);
+  });
+
+  $('#sVpnTest')?.addEventListener('click', async () => {
+    if (!hasBridge) { showToast('Run npm start to test VPN.'); return; }
+    const el = $('#vpnTestResult');
+    if (el) el.textContent = 'Testing…';
+    try {
+      const r = await window.phantom.warp.test();
+      if (r.ok) {
+        const parts = [`✓ ${r.latencyMs}ms`];
+        if (r.ip)   parts.push(`IP: ${r.ip}`);
+        if (r.colo) parts.push(`DC: ${r.colo}`);
+        if (r.loc)  parts.push(r.loc);
+        if (el) { el.textContent = parts.join(' · '); el.style.color = 'var(--green)'; }
+      } else {
+        if (el) { el.textContent = `✗ ${r.error}`; el.style.color = 'var(--red)'; }
+      }
+    } catch (err) {
+      if (el) { el.textContent = `✗ ${err.message}`; el.style.color = 'var(--red)'; }
+    }
+  });
+
+  // ── Vault ──
+  $('#sVaultDefault')?.addEventListener('change', (e) => {
+    saveSettings({ vaultDefault: e.target.value });
+    window.phantom?.vault?.setMode?.(e.target.value);
+  });
+  $('#sVaultDuration')?.addEventListener('change', (e) => saveSettings({ vaultDuration: Number(e.target.value) }));
+
+  // ── Containers ──
+  $$('[data-wipe-container]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const c = btn.dataset.wipeContainer;
+      window.phantom?.wipe?.container?.(c);
+      showToast(`${c.charAt(0).toUpperCase() + c.slice(1)} container wiped.`);
+    });
+  });
+
+  // ── About ──
+  $('#sResetAllBtn')?.addEventListener('click', () => {
+    localStorage.removeItem(SETTINGS_KEY);
+    applySettingsToUI();
+    showToast('All settings reset to defaults.');
+  });
+
+  // Apply saved settings on load
+  applyLiveSettings(loadSettings());
+}
+
+(async () => {
+  await loadWidgetPrefs();   // load widget prefs BEFORE rendering dashboard to avoid flash
+  resetToDashboard();
+  await restoreTabs();
+  await loadProfiles();
+
+  // If the active profile has a PIN, require it on launch
+  if (currentProfile?.hasPin) {
+    lockScreenMode = true;
+    pinBuffer = '';
+    updatePinDots();
+    $('#pinOverlay').classList.add('show');
+  }
+
+  initWipe();
+  initSecurity();
+  initGhostMode();
+  initSettings();
+})();
+</script>
+</body>
+</html>
+

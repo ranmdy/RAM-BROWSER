@@ -1,0 +1,7 @@
+RAM Browser
+Copyright © 2026 Ram Browser. All rights reserved.
+
+This software is provided for personal use only. Redistribution in any form
+is prohibited without prior written permission.
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.

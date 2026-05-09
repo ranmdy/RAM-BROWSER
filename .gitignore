@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+coverage/
+*.log
+.DS_Store
+
+# Cloudflare WARP binaries are platform/vendor assets and should not be committed.
+resources/warp/**/warp-cli*
+resources/warp/**/warp-svc*

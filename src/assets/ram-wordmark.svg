@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 64" width="320" height="64">
+  <defs>
+    <linearGradient id="tileBodyW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3a3a3f"></stop>
+      <stop offset="100%" stop-color="#1a1a1c"></stop>
+    </linearGradient>
+    <linearGradient id="sheenW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.55"></stop>
+      <stop offset="60%" stop-color="#ffffff" stop-opacity="0"></stop>
+    </linearGradient>
+    <linearGradient id="hornGW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f3f3f4"></stop>
+      <stop offset="100%" stop-color="#6e6e74"></stop>
+    </linearGradient>
+    <linearGradient id="woolW" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8e8eb"></stop>
+      <stop offset="100%" stop-color="#9a9aa0"></stop>
+    </linearGradient>
+  </defs>
+
+  
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#tileBodyW)"></rect>
+
+  
+  <g transform="translate(32 36) scale(0.26)">
+    <g fill="none" stroke="url(#hornGW)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M -28 -38 C -56 -36, -82 -22, -82 4 C -82 28, -64 38, -46 32 C -32 27, -26 14, -34 4"></path>
+      <path d="M  28 -38 C  56 -36,  82 -22,  82 4 C  82 28,  64 38,  46 32 C  32 27,  26 14,  34 4"></path>
+    </g>
+    <path d="M -32 -42 C -32 -62, -18 -72, 0 -72 C 18 -72, 32 -62, 32 -42 L 32 6 C 32 18, 24 26, 14 28 L -14 28 C -24 26, -32 18, -32 6 Z" fill="url(#woolW)"></path>
+    <path d="M -16 -64 C -10 -74, -4 -76, 0 -70 C 4 -76, 10 -74, 16 -64 C 12 -58, -12 -58, -16 -64 Z" fill="#f3f3f4"></path>
+    <ellipse cx="-12" cy="-14" rx="3.4" ry="4.2" fill="#0e0e10"></ellipse>
+    <ellipse cx=" 12" cy="-14" rx="3.4" ry="4.2" fill="#0e0e10"></ellipse>
+    <path d="M -16 18 C -16 36, 16 36, 16 18 L 14 36 C 14 46, -14 46, -14 36 Z" fill="#a8a8ae"></path>
+  </g>
+
+  
+  <path d="M 4 24 Q 4 4 24 4 L 44 4 Q 60 4 60 20 L 60 28 C 44 24, 16 24, 4 28 Z" fill="url(#sheenW)"></path>
+  <rect x="4.5" y="4.5" width="55" height="55" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity="0.18"></rect>
+
+  
+  <text x="76" y="40" font-family="-apple-system, &#39;SF Pro Display&#39;, Inter, sans-serif" font-size="22" font-weight="600" letter-spacing="0.4" fill="#f5f5f7">ram browser</text>
+</svg>

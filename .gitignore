@@ -8,10 +8,3 @@ coverage/
 # Cloudflare WARP binaries are platform/vendor assets and should not be committed.
 resources/warp/**/warp-cli*
 resources/warp/**/warp-svc*
-
-# Personal / internal notes
-progress.md
-tweets.txt
-features.md
-"README (2).md"
-test-results/

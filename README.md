@@ -1,5 +1,7 @@
 # RAM Browser
 
+**[rambrowser.netlify.app](https://rambrowser.netlify.app)** — Landing page
+
 A privacy-first desktop browser built on Electron. Always-on VPN, automatic 24-hour wipe, encrypted profiles, and a hardware-level vault for your camera and mic.
 
 ## Features

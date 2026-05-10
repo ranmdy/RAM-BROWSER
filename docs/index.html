@@ -247,8 +247,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
 <header class="hero">
   <div class="container">
     <div class="eyebrow"><span class="pulse"></span>v0.1.0 · self-hosted · no telemetry</div>
-    <h1>Browse freely.<br/><em>Leave nothing behind.</em></h1>
-    <p class="lede">A privacy-first desktop browser. Always-on VPN, automatic 24-hour wipe, encrypted containers, and a vault for the things big tech won't give you.</p>
+    <h1>No history.<br/><em>By design.</em></h1>
+    <p class="lede">Desktop browser that routes everything through WARP, wipes all data every 24 hours, and keeps profiles encrypted with Argon2id. No accounts, no sync, no telemetry.</p>
     <div class="cta-row">
       <a class="btn btn-primary btn-lg" href="#download">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v14m0 0l-5-5m5 5l5-5M5 21h14"/></svg>
@@ -310,8 +310,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
         </div>
         <div class="win-body">
           <div class="dash-card dash-hero">
-            <h2>Private browsing<br/>with the controls visible.</h2>
-            <p>VPN, wipe timer, encrypted messaging, vault — all in one place. No accounts. No telemetry. No shortcuts.</p>
+            <h2>Everything in one place.</h2>
+            <p>VPN status, wipe countdown, container selector, vault — visible on the dashboard. No digging through settings.</p>
             <div class="search">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
               Search privately, or enter a URL
@@ -345,9 +345,9 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
 <section id="pillars">
   <div class="container">
     <div class="section-head">
-      <div class="kicker">Four pillars</div>
-      <h2>Privacy as infrastructure, not a feature.</h2>
-      <p>Most browsers add private mode as a button. Ram makes private the only mode — and shows you exactly what it's doing.</p>
+      <div class="kicker">How it works</div>
+      <h2>Four things running every session.</h2>
+      <p>Not optional. Not toggles. These run from the moment you open the app to the moment the wipe timer hits zero.</p>
     </div>
     <div class="pillars">
       <article class="pillar span-8">
@@ -356,8 +356,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
             <div class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
             <div class="ek">01 · Wipe</div>
           </div>
-          <h3>Every 24 hours, the slate is clean.</h3>
-          <p>Cookies, cache, history, IndexedDB, service workers, localStorage, downloads — all of it purged on a fixed cycle. Tabs survive via encrypted snapshot; nothing else does.</p>
+          <h3>Data doesn't survive the timer.</h3>
+          <p>Cookies, cache, history, IndexedDB, service workers, localStorage — cleared on a fixed cycle. Tabs restore from an encrypted snapshot. Everything else is gone.</p>
         </div>
         <div class="demo demo-wipe">
           <div>
@@ -373,8 +373,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
             <div class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg></div>
             <div class="ek">02 · Tunnel</div>
           </div>
-          <h3>Always-on VPN, kill-switch first.</h3>
-          <p>Cloudflare WARP under the hood. If the tunnel drops, every request stops. No leaks, no exceptions.</p>
+          <h3>WARP on, kill-switch armed.</h3>
+          <p>Cloudflare WARP routes all traffic. If the tunnel drops, requests stop — not rerouted, stopped. WebRTC is locked to the tunnel interface.</p>
         </div>
         <div class="demo demo-vpn">
           <div class="line">
@@ -391,8 +391,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
             <div class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M8 6V4M16 6V4"/></svg></div>
             <div class="ek">03 · Containers</div>
           </div>
-          <h3>Five jars, fully isolated.</h3>
-          <p>Storage, cookies, and identity partitioned per jar. Switch in one click; nothing crosses the line.</p>
+          <h3>Five containers, nothing shared.</h3>
+          <p>Each container gets its own storage partition, cookie store, and session. Switching is one click. Nothing leaks between them.</p>
         </div>
         <div class="demo demo-jars">
           <span class="jar active"><span class="dot" style="background:#8e8e93"></span>Default</span>
@@ -408,8 +408,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
             <div class="glyph"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
             <div class="ek">04 · Vault</div>
           </div>
-          <h3>The kill-switch for every sensor.</h3>
-          <p>Camera, microphone, location, clipboard, notifications — all denied by default, granted per-site, per-session, then forgotten. Locked behind a PIN and a panic shortcut that wipes everything in one keystroke.</p>
+          <h3>Camera, mic, location — off by default.</h3>
+          <p>Permission requests are denied unless you explicitly grant them. Grants are per-site and per-session — revoked when the tab closes. Panic shortcut wipes everything immediately.</p>
         </div>
         <div class="demo demo-vault">
           <div class="row"><span>Camera</span><span class="deny">DENY</span></div>
@@ -426,25 +426,25 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
 <section id="how">
   <div class="container">
     <div class="section-head">
-      <div class="kicker">How it works</div>
-      <h2>Three minutes to a clean machine.</h2>
-      <p>No accounts, no logins, no cloud sync — ever. Install runs locally, encrypts a profile to disk, brings up the tunnel, and starts the clock.</p>
+      <div class="kicker">Setup</div>
+      <h2>Install, set a PIN, browse.</h2>
+      <p>No account creation, no cloud sync. The profile is encrypted locally. WARP comes up on launch and the wipe timer starts.</p>
     </div>
     <div class="steps">
       <div class="step">
         <div class="num"><span>1</span>install</div>
-        <h3>Download. Open. Done.</h3>
-        <p>Notarised binary, signed by us. SHA-256 published next to every release. No installer that phones home — ever.</p>
+        <h3>Download and open.</h3>
+        <p>Signed binary. SHA-256 published with every release. No installer, no background processes on first run.</p>
       </div>
       <div class="step">
         <div class="num"><span>2</span>profile</div>
-        <h3>Pick a 6-digit PIN.</h3>
-        <p>Argon2id-derived key encrypts every byte of state on disk. We never see it. Lose it and the profile is gone — that's the design.</p>
+        <h3>Set a PIN.</h3>
+        <p>Argon2id derives the encryption key from your PIN. The key never leaves your machine. Lose the PIN and the profile is unrecoverable — intentionally.</p>
       </div>
       <div class="step">
         <div class="num"><span>3</span>browse</div>
-        <h3>The clock starts.</h3>
-        <p>VPN comes up, kill-switch arms, the wipe timer begins. You browse normally. At T-zero, the slate clears itself.</p>
+        <h3>Browse normally.</h3>
+        <p>WARP connects, kill-switch arms, the wipe timer starts. When it hits zero, storage is cleared and the timer resets.</p>
       </div>
     </div>
   </div>
@@ -455,8 +455,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
   <div class="container">
     <div class="section-head">
       <div class="kicker">Compare</div>
-      <h2>What's actually in the box.</h2>
-      <p>Most "private browsers" are Chrome with a different paint job. Here's what's different about this one.</p>
+      <h2>Feature comparison.</h2>
+      <p>Most browsers that call themselves private are Chromium with tracking opt-outs. The differences below are architectural, not settings.</p>
     </div>
     <div class="compare">
       <table>
@@ -515,9 +515,9 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
 <section id="receipts">
   <div class="container">
     <div class="section-head">
-      <div class="kicker">Receipts, not promises</div>
-      <h2>What the browser blocked, this hour.</h2>
-      <p>Everything Ram does to protect you, surfaced live in the status bar. Auditable, exportable, never sent home.</p>
+      <div class="kicker">Stats</div>
+      <h2>What ran in the background.</h2>
+      <p>The status bar shows live counts for everything the browser intercepted. None of it is sent anywhere.</p>
     </div>
     <div class="receipts">
       <div class="receipt">
@@ -547,8 +547,8 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
 <!-- ═════════════════════════ FINAL CTA ═════════════════════════ -->
 <section class="final" id="download">
   <div class="container">
-    <h2>Browse freely.<br/>Leave nothing behind.</h2>
-    <p>14 megabytes. No account. No telemetry. The clock starts the moment you open it.</p>
+    <h2>14 MB.<br/>No account required.</h2>
+    <p>Open the DMG, drag to Applications, set a PIN. WARP connects on first launch and the wipe timer starts.</p>
     <div class="cta-row" style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
       <a class="btn btn-primary btn-lg" href="https://github.com/ranmdy/RAM-BROWSER/releases/latest">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v14m0 0l-5-5m5 5l5-5M5 21h14"/></svg>
@@ -564,7 +564,7 @@ footer .blurb{font-size:12px;color:var(--text-2);max-width:280px;line-height:1.5
   <div class="container">
     <div>
       <div class="brand"><img src="assets/ram-logo.svg" alt=""/><span>ram browser</span></div>
-      <p class="blurb">A privacy-first desktop browser. Built in the open. No accounts, no telemetry, no shortcuts.</p>
+      <p class="blurb">Desktop browser with WARP, 24h auto-wipe, and encrypted profiles. Source on GitHub.</p>
     </div>
     <div>
       <h4>Product</h4>

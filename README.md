@@ -1,68 +1,64 @@
 # RAM Browser
 
-**[rambrowser.netlify.app](https://rambrowser.netlify.app)** — Landing page
+Desktop browser built on Electron. Routes all traffic through Cloudflare WARP, wipes browsing data on a 24-hour timer, and keeps profiles encrypted at rest with Argon2id.
 
-A privacy-first desktop browser built on Electron. Always-on VPN, automatic 24-hour wipe, encrypted profiles, and a hardware-level vault for your camera and mic.
+→ [rambrowser.netlify.app](https://rambrowser.netlify.app)
 
-## Features
+## What it does
 
-- **Always-on WARP VPN** — traffic routed through Cloudflare WARP with a kill-switch that cuts the connection if the VPN drops
-- **24-hour wipe engine** — all browsing data (cache, cookies, history, sessions) wiped on a configurable timer, automatically
-- **Encrypted profiles** — each profile is Argon2id-encrypted with a PIN; lose the PIN, lose the profile — by design
-- **Ghost mode** — decoy PIN opens a clean empty profile; real profile stays hidden
-- **5-container isolation** — Default, Work, Social, Finance, Research — storage, cookies, and identity partitioned per container
-- **Vault** — camera, microphone, location, clipboard, and notifications denied by default; granted per-site, per-session, then forgotten
-- **Panic wipe** — one shortcut clears everything instantly
-- **No accounts, no cloud sync, no telemetry** — ever
+- WARP VPN on by default. Kill-switch cuts traffic if the tunnel drops.
+- 24h wipe. Cache, cookies, history, sessions — gone on a timer. Configurable from 1h to 7 days.
+- Encrypted profiles with a PIN. Argon2id-derived key. No PIN, no data.
+- Decoy PIN that opens a clean profile. Real profile stays hidden.
+- Five isolated containers (Default, Work, Social, Finance, Research). Nothing crosses between them.
+- Camera, mic, location off by default. Granted per-site, per-session, then revoked.
+- Panic shortcut (`Cmd+Shift+X`) wipes everything immediately.
+- Fingerprint hardening — canvas noise, audio noise, spoofed hardware concurrency and memory, font enumeration blocked.
+- Tracker/ad blocking via request interception (~50 domains).
+- HTTPS-only mode, WebRTC leak protection, optional Tor routing.
 
-## Download
+## Install
 
-Get the latest release from the [Releases](https://github.com/ranmdy/RAM-BROWSER/releases) page.
+[Releases →](https://github.com/ranmdy/RAM-BROWSER/releases)
 
-| Platform | File |
-|----------|------|
-| macOS (Apple Silicon) | `Ram Browser-x.x.x-arm64.dmg` |
-| macOS (Intel) | `Ram Browser-x.x.x.dmg` |
+macOS Apple Silicon: `Ram Browser-0.1.0-arm64.dmg`
+macOS Intel: `Ram Browser-0.1.0.dmg`
 
-## Build from source
+Open the DMG, drag to Applications.
 
-```bash
-# Install dependencies
+## Build
+
+Requires Node 18+, macOS 12+.
+
+```sh
 npm install
-
-# Run in development
-npm start
-
-# Build macOS DMG
-PYTHON=/usr/bin/python3 npm run dist:mac
+npm start                              # dev
+PYTHON=/usr/bin/python3 npm run dist:mac  # package (needs system Python for argon2)
 ```
 
-**Requirements:** Node.js 18+, macOS 12+
-
-## Architecture
+## Structure
 
 ```
-src/
-  main/
-    index.js              # Electron main process, IPC handlers
-    preload.js            # Context bridge (renderer ↔ main)
-    privacy/
-      wipe-engine.js      # 24-hour wipe timer
-      tab-snapshot.js     # Tab session persistence
-    profiles/
-      manager.js          # Profile CRUD, ghost mode
-      encryption.js       # Argon2id key derivation
-      pin.js              # PIN verify / set / decoy
-    security/
-      warp-supervisor.js  # WARP VPN process management
-      screenshot.js       # Screen capture
-      exif-strip.js       # EXIF metadata removal
+src/main/
+  index.js              # main process, all IPC handlers
+  preload.js            # context bridge
+  privacy/
+    wipe-engine.js
+    tab-snapshot.js
+  profiles/
+    manager.js          # CRUD, ghost mode, OS keychain
+    encryption.js       # AES-256-GCM
+    pin.js              # Argon2id, decoy PIN
+  security/
+    warp-supervisor.js  # WARP daemon, auto-restart, kill-switch
+    screenshot.js
+    exif-strip.js
   shared/
-    link-sanitiser.js     # URL tracking param stripping
-phantom-browser-ui.html   # Renderer — full browser UI
-landing/                  # Landing page (GitHub Pages)
+    link-sanitiser.js   # strips utm_*, fbclid, redirect wrappers
+phantom-browser-ui.html # entire renderer
+docs/                   # landing page
 ```
 
 ## License
 
-Private — all rights reserved.
+Private.

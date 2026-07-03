@@ -140,32 +140,33 @@ async function createProfile(opts = {}) {
   const profileDir = path.join(profilesRoot, uuid);
   await fs.mkdir(profileDir, { recursive: true });
 
-  // Generate a random profile-level encryption key
-  const key = generateKey();
-
-  // Write initial encrypted prefs
-  const prefs = {
-    name: name || `Profile ${Date.now()}`,
-    color,
-    containers: CONTAINERS,
-    wipeIntervalMs: 24 * 60 * 60 * 1000,
-    rememberTabs: true,
-    theme: 'dark'
-  };
-  await writePrefs(uuid, prefs, key);
-
   let hasPinFlag = false;
   let hasDecoyFlag = false;
 
+  // Profile-level encryption key:
+  //  - PIN profiles: derive from the PIN (setPin must run first — it writes
+  //    the salt deriveProfileKey reads). The key is re-derivable on every
+  //    unlock, so prefs.enc stays readable across sessions.
+  //  - PIN-less profiles: random key, protected via safeStorage below.
+  let key;
   if (pin) {
     await setPin(profileDir, pin);
     hasPinFlag = true;
+    key = await deriveProfileKey(profileDir, pin);
+  } else {
+    key = generateKey();
   }
 
   if (decoyPin) {
+    // The decoy PIN maps to decoyTargetUuid (a separate profile with its own
+    // key) — it never decrypts this profile's prefs, so no key is derived here.
     await setDecoyPin(profileDir, decoyPin);
     hasDecoyFlag = true;
   }
+
+  // Write initial encrypted prefs
+  const prefs = defaultPrefs(name, color);
+  await writePrefs(uuid, prefs, key);
 
   const descriptor = {
     uuid,
@@ -247,6 +248,9 @@ async function switchProfile(uuid, pin) {
       if (targetUuid) {
         const targetProfile = await getProfile(targetUuid);
         const targetKey = await resolveKey(targetProfile, null);
+        // Ghost-mode consistency: heal the decoy target's prefs the same
+        // way a real unlock would.
+        await healPrefs(targetUuid, targetKey, targetProfile);
         await activateProfile(targetUuid);
         return { result: 'decoy', profile: targetProfile, key: targetKey };
       }
@@ -260,6 +264,9 @@ async function switchProfile(uuid, pin) {
 
     // Valid PIN
     const key = await deriveProfileKey(profileDir, pin);
+    // Self-heal: pre-fix PIN profiles have prefs.enc under a lost key —
+    // regenerate defaults under the PIN-derived key (invisible to the user).
+    await healPrefs(uuid, key, profile);
     await activateProfile(uuid);
     return { result: 'ok', profile, key };
   }
@@ -327,6 +334,55 @@ function profileDir(uuid) {
 }
 
 // ── prefs ─────────────────────────────────────────────────────────────────────
+
+function defaultPrefs(name, color) {
+  return {
+    name: name || `Profile ${Date.now()}`,
+    color: color || DEFAULT_PROFILE_COLOR,
+    containers: CONTAINERS,
+    wipeIntervalMs: 24 * 60 * 60 * 1000,
+    rememberTabs: true,
+    theme: 'dark'
+  };
+}
+
+/**
+ * Ensure prefs.enc is decryptable under `key`; self-heal if not.
+ *
+ * Profiles created with a PIN before the key-derivation fix had prefs.enc
+ * encrypted under a random key that was never persisted — that data is
+ * cryptographically unrecoverable. On unlock, detect this and regenerate
+ * defaults under the (now re-derivable) key.
+ *
+ * Only rewrites on deterministic failure: GCM auth failure (wrong key) or
+ * a missing file. Transient I/O errors never trigger a rewrite, so
+ * recoverable data is never destroyed.
+ *
+ * @param {string} uuid
+ * @param {Buffer|null} key
+ * @param {object|null} profile  descriptor for default name/color
+ * @returns {Promise<boolean>} true if prefs were regenerated
+ */
+async function healPrefs(uuid, key, profile) {
+  if (!key) return false;
+  const prefsPath = path.join(profilesRoot, uuid, 'prefs.enc');
+  let blob = null;
+  try {
+    blob = await fs.readFile(prefsPath);
+  } catch (err) {
+    if (err?.code !== 'ENOENT') return false; // transient I/O — leave untouched
+  }
+  if (blob) {
+    try {
+      decryptJson(blob, key);
+      return false; // readable — nothing to heal
+    } catch {
+      // Auth failure: encrypted under a lost key — unrecoverable by design.
+    }
+  }
+  await writePrefs(uuid, defaultPrefs(profile?.name, profile?.color), key);
+  return true;
+}
 
 async function readPrefs(uuid, key) {
   try {
@@ -426,7 +482,9 @@ module.exports = {
   updateProfile,
   readPrefs,
   writePrefs,
+  healPrefs,
   profileDir,
+  resolveKey,
   loadIndex,
   setUnlockPhrase,
   unlockHiddenProfile

@@ -2326,7 +2326,7 @@ async function restoreTabs() {
 function normalizeAddress(input) {
   const v = input.trim();
   if (!v) return '';
-  if (/^(https?|file):\/\//i.test(v)) return v;
+  if (/^(https?|file|phantom):\/\//i.test(v)) return v;
   if (/^(localhost|127\.|10\.|192\.168\.|\[?::1\]?)/i.test(v)) return `http://${v}`;
   if (/^[a-z0-9.-]+\.[a-z]{2,}(:\d+)?(\/.*)?$/i.test(v)) return `https://${v}`;
   const engine = SEARCH_ENGINES[loadSettings().searchEngine] || DEFAULT_SEARCH_URL;
@@ -2388,12 +2388,16 @@ $$('#tabContextMenu [data-container]').forEach((item) => {
     if (!tab) return;
     const nc = item.dataset.container;
     if (nc === tab.container) { hideTabContextMenu(); return; }
-    if (hasBridge) window.phantom.wipe.container(tab.container).catch(() => {});
+    const oldContainer = tab.container;
     tab.container = nc;
+    // Only wipe the old container if no other tab still lives in it —
+    // wiping unconditionally would log out every other tab sharing it.
+    const stillUsed = [...tabs.values()].some((t) => t.container === oldContainer);
+    if (hasBridge && !stillUsed) window.phantom.wipe.container(oldContainer).catch(() => {});
     if (tab.url) navigateTab(tab, tab.url);
     renderTab(tab);
     hideTabContextMenu();
-    showToast(`Moved to ${nc} container (old data wiped).`);
+    showToast(stillUsed ? `Moved to ${nc} container.` : `Moved to ${nc} container (old data wiped).`);
   });
 });
 
@@ -2658,6 +2662,15 @@ window.phantom?.menu?.onFind?.(() => openFindBar());
 window.phantom?.menu?.onZoomIn?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomIn?.(t.id); });
 window.phantom?.menu?.onZoomOut?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomOut?.(t.id); });
 window.phantom?.menu?.onZoomReset?.(() => { const t = activeTab(); if (t?.url) window.phantom?.tabViews?.zoomReset?.(t.id); });
+function cycleTab(dir) {
+  const ids = [...tabs.keys()];
+  if (ids.length < 2) return;
+  const idx = ids.indexOf(activeTabId);
+  const next = ids[(idx + dir + ids.length) % ids.length];
+  activateTab(next);
+}
+window.phantom?.menu?.onNextTab?.(() => cycleTab(1));
+window.phantom?.menu?.onPrevTab?.(() => cycleTab(-1));
 
 // ── Find bar ──────────────────────────────────────────────────────────────────
 function openFindBar() {

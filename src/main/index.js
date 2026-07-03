@@ -8,7 +8,7 @@ const { sanitiseUrl, isLocalAddress } = require('../shared/link-sanitiser');
 
 // ── profiles ──────────────────────────────────────────────────────────────────
 const profileManager = require('./profiles/manager');
-const { verifyPin, setPin, setDecoyPin } = require('./profiles/pin');
+const { verifyPin, setPin, setDecoyPin, deriveProfileKey } = require('./profiles/pin');
 const { createSnapshotManager } = require('./privacy/tab-snapshot');
 
 // ── privacy ───────────────────────────────────────────────────────────────────
@@ -30,13 +30,65 @@ let requireWarp = process.env.RAM_REQUIRE_VPN === '1';
 
 // ── state ─────────────────────────────────────────────────────────────────────
 let mainWindow = null;
+// Multi-window registry — every BrowserWindow (primary, "New Window", and
+// per-profile windows) gets an entry: { win, profile, partitions, tabViews }.
+//  - profile: null for windows bound to the globally active profile;
+//    a fixed {uuid,name,color} snapshot for isolated profile windows.
+//  - partitions: Map(container → partition). Global windows share PARTITIONS;
+//    profile windows get namespaced in-memory partitions (full isolation).
+//  - tabViews: Map(tabId → WebContentsView), per window (tab ids are
+//    renderer-generated and may collide across windows).
+const windows = new Map();
+// Namespaced partitions of currently-open profile windows — included in
+// managedSessions() so panic/wipe/proxy changes cover them.
+const extraPartitions = new Set();
+
+function winStateFor(webContents) {
+  const win = BrowserWindow.fromWebContents(webContents);
+  return win ? windows.get(win.id) : null;
+}
+
+// Reverse lookup: which window owns the tab hosting this webContents?
+function winStateForTabContents(webContents) {
+  for (const ws of windows.values()) {
+    for (const view of ws.tabViews.values()) {
+      if (view.webContents === webContents) return ws;
+    }
+  }
+  return null;
+}
+
+// Send to every window bound to the globally active profile (profile === null)
+function sendGlobalProfileWindows(channel, payload) {
+  for (const ws of windows.values()) {
+    if (!ws.profile && !ws.win.isDestroyed()) ws.win.webContents.send(channel, payload);
+  }
+}
+
+// Send to every open window (used for app-global state like vault mode)
+function broadcast(channel, payload) {
+  for (const ws of windows.values()) {
+    if (!ws.win.isDestroyed()) ws.win.webContents.send(channel, payload);
+  }
+}
+
+// Close all isolated profile windows (panic / ghost mode — no real-profile
+// data may stay visible in a secondary window)
+function closeProfileWindows() {
+  for (const ws of [...windows.values()]) {
+    if (ws.profile) { try { ws.win.close(); } catch {} }
+  }
+}
 let vaultMode = 'session';
 let vaultTimedExpiry = null;   // epoch ms for timed mode expiry
 let vaultTimedTimer = null;    // NodeJS.Timeout for timed auto-revoke
 let activeProfileUuid = null;
+let activeProfileKey = null;  // key of the active profile (PIN-derived keys only exist post-unlock)
 let activeProfileIsDecoy = false;
 let activeProfileIsHidden = false;
+let activeProfileHasPin = false; // PIN-less profiles must never be PIN-locked (unlockable = panic-wipe trap)
 let activeProfileName = '';
+let activeProfileColor = '';
 let isScreenLocked = false; // true while PIN overlay is up
 let tabSnapshotManager = null;
 let wipeOnQuit = false;          // set by settings:wipe-on-quit IPC
@@ -153,7 +205,7 @@ function warpStatus() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function managedSessions() {
-  return [...PARTITIONS.values()].map((partition) => session.fromPartition(partition));
+  return [...PARTITIONS.values(), ...extraPartitions].map((partition) => session.fromPartition(partition));
 }
 
 // ── Tracker/ad block list ─────────────────────────────────────────────────────
@@ -187,6 +239,23 @@ const BLOCK_DOMAINS = new Set([
 
 let trackerBlockEnabled = true; // set by settings:tracker-block IPC
 
+// ── HTTPS-only upgrade tracking ───────────────────────────────────────────────
+// upgradedHosts: hosts whose http:// requests we rewrote to https://.
+// httpsExemptHosts: hosts whose upgrade failed at the TLS/connection layer —
+// they load over plain http from then on (session-scoped, not persisted).
+// Fallback only ever applies to hosts WE upgraded; explicit https:// URLs are
+// never downgraded.
+const upgradedHosts = new Set();
+const httpsExemptHosts = new Set();
+
+function isHttpsFallbackError(code) {
+  // TLS handshake / certificate errors (-107, -113, -200..-218) and
+  // connection-level failures that plain http may still serve.
+  return code === -107 || code === -113 ||
+         (code <= -200 && code >= -218) ||
+         [-100, -101, -102, -118].includes(code);
+}
+
 function isBlockedDomain(rawUrl) {
   if (!trackerBlockEnabled) return false;
   try {
@@ -211,14 +280,26 @@ function isNetworkRequest(rawUrl) {
   }
 }
 
-function isFinanceSession(targetSession) {
-  // Detect the finance partition by checking the session partition name
-  try {
-    return targetSession.storagePath?.includes('ram-finance') ||
-           String(targetSession.getStoragePath?.() || '').includes('ram-finance');
-  } catch {
-    return false;
+// Multi-label public suffixes where the registrable domain is three labels
+// (e.g. bank.co.uk). Not exhaustive — covers the common cases; unknown hosts
+// fall back to the two-label rule.
+const SECOND_LEVEL_TLDS = new Set([
+  'co.uk', 'org.uk', 'ac.uk', 'gov.uk', 'me.uk', 'net.uk',
+  'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au',
+  'co.nz', 'org.nz', 'net.nz', 'govt.nz',
+  'co.jp', 'or.jp', 'ne.jp', 'ac.jp', 'go.jp',
+  'com.br', 'com.mx', 'com.ar', 'com.co',
+  'co.in', 'co.za', 'co.kr', 'co.id', 'co.th',
+  'com.sg', 'com.hk', 'com.tw', 'com.my', 'com.ph',
+  'com.tr', 'com.cn', 'com.vn', 'com.eg', 'com.sa'
+]);
+
+function baseDomain(host) {
+  const parts = host.toLowerCase().split('.');
+  if (parts.length >= 3 && SECOND_LEVEL_TLDS.has(parts.slice(-2).join('.'))) {
+    return parts.slice(-3).join('.');
   }
+  return parts.slice(-2).join('.');
 }
 
 function isThirdPartyScript(details) {
@@ -230,18 +311,34 @@ function isThirdPartyScript(details) {
     const refHost = new URL(ref).hostname;
     // Same host or subdomain relationship = first-party
     if (reqHost === refHost) return false;
-    const baseDomain = (h) => h.split('.').slice(-2).join('.');
     return baseDomain(reqHost) !== baseDomain(refHost);
   } catch {
     return false;
   }
 }
 
-async function configureSession(targetSession) {
+async function configureSession(targetSession, partition = '') {
   if (targetSession.__ramConfigured) return;
   targetSession.__ramConfigured = true;
 
-  const isFinance = String(targetSession.storagePath || '').toLowerCase().includes('ram-finance');
+  // In-memory partitions (no `persist:` prefix) have no storagePath, so the
+  // partition name must be passed in explicitly — never derived from paths.
+  // Suffix match covers both global ('ram-finance') and profile-window
+  // namespaced ('ram-p<uuid8>-finance') partitions.
+  const isFinance = partition.endsWith('-finance');
+
+  // Resolve the window that owns this partition (for dialogs/IPC). Prefers the
+  // focused window when it holds the partition (global partitions are shared
+  // by the primary and any "New Window" siblings).
+  const ownerWindow = () => {
+    const focused = BrowserWindow.getFocusedWindow();
+    const focusedState = focused ? windows.get(focused.id) : null;
+    if (focusedState && [...focusedState.partitions.values()].includes(partition)) return focused;
+    for (const ws of windows.values()) {
+      if (!ws.win.isDestroyed() && [...ws.partitions.values()].includes(partition)) return ws.win;
+    }
+    return mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+  };
 
   // Strip Electron from the user-agent so sites don't detect/block Electron
   const rawUA = targetSession.getUserAgent();
@@ -275,11 +372,13 @@ async function configureSession(targetSession) {
       if (!allowed) {
         privacyReport.mediaBlocked++;
       } else {
-        // Record the grant for per-origin tracking
+        // Record the grant for per-origin tracking (grant keys are
+        // window-scoped: `${winId}:${tabId}` — tab ids collide across windows)
         try {
           const origin = details?.requestingUrl || _wc.getURL();
-          const tabId = [...tabViews.entries()].find(([, v]) => v.webContents === _wc)?.[0];
-          if (tabId) recordVaultGrant(tabId, origin);
+          const ws = winStateForTabContents(_wc);
+          const tabId = ws ? [...ws.tabViews.entries()].find(([, v]) => v.webContents === _wc)?.[0] : null;
+          if (ws && tabId != null) recordVaultGrant(`${ws.win.id}:${tabId}`, origin);
         } catch {}
       }
       callback(allowed);
@@ -298,10 +397,23 @@ async function configureSession(targetSession) {
     callback(false);
   });
 
-  // Note: setPermissionCheckHandler is intentionally omitted.
-  // setPermissionRequestHandler above handles all explicit permission requests.
-  // Overly restrictive permission checks in Electron 41 can interfere with
-  // normal webview navigation and resource loading.
+  // Permission CHECKS gate origins whose grant predates a state change
+  // (lock, ghost mode, vault lock) — without this, an origin granted
+  // notifications before the screen locked could keep firing them while
+  // locked. Only user-visible permissions are gated: blanket denial here
+  // breaks normal navigation and resource loading in Electron 41.
+  targetSession.setPermissionCheckHandler((_wc, permission) => {
+    switch (permission) {
+      case 'notifications':
+        return !isFinance && !activeProfileIsDecoy && !isScreenLocked;
+      case 'media':
+        return !isFinance && vaultMode !== 'locked';
+      case 'geolocation':
+        return false; // request handler never grants it
+      default:
+        return true;
+    }
+  });
 
   targetSession.webRequest.onBeforeRequest((details, callback) => {
     try {
@@ -327,11 +439,17 @@ async function configureSession(targetSession) {
         return;
       }
 
-      // HTTPS-only: upgrade plain http:// → https:// for network requests
-      if (httpsOnlyEnabled && details.url.startsWith('http://') && isNetworkRequest(details.url)) {
-        const upgraded = details.url.replace(/^http:\/\//, 'https://');
-        callback({ redirectURL: upgraded });
-        return;
+      // HTTPS-only: upgrade plain http:// → https:// for network requests.
+      // Exemptions: local addresses (localhost, 127.x, RFC1918) and hosts
+      // already confirmed HTTP-only after a failed upgrade.
+      if (httpsOnlyEnabled && details.url.startsWith('http://') && isNetworkRequest(details.url) && !isLocalAddress(details.url)) {
+        let host = null;
+        try { host = new URL(details.url).hostname; } catch {}
+        if (host && !httpsExemptHosts.has(host)) {
+          upgradedHosts.add(host);
+          callback({ redirectURL: details.url.replace(/^http:\/\//, 'https://') });
+          return;
+        }
       }
 
       if (linkSanitiserEnabled || redirectBlockEnabled) {
@@ -371,30 +489,33 @@ async function configureSession(targetSession) {
   targetSession.on('will-download', (_e, item) => {
     const filename = item.getFilename();
     const defaultPath = path.join(app.getPath('downloads'), filename);
-    dialog.showSaveDialog(mainWindow, { defaultPath, title: 'Save file' }).then(({ canceled, filePath }) => {
+    const owner = ownerWindow();
+    if (!owner) { item.cancel(); return; }
+    const sendOwner = (ch, payload) => { if (!owner.isDestroyed()) owner.webContents.send(ch, payload); };
+    dialog.showSaveDialog(owner, { defaultPath, title: 'Save file' }).then(({ canceled, filePath }) => {
       if (canceled || !filePath) { item.cancel(); return; }
       item.setSavePath(filePath);
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('download:start', { filename, total: item.getTotalBytes() });
-      }
+      sendOwner('download:start', { filename, total: item.getTotalBytes() });
       item.on('updated', (_ev, state) => {
-        if (state === 'progressing' && mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('download:progress', {
+        if (state === 'progressing') {
+          sendOwner('download:progress', {
             filename, received: item.getReceivedBytes(), total: item.getTotalBytes()
           });
         }
       });
       item.once('done', (_ev, state) => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('download:done', { filename, state });
-        }
+        sendOwner('download:done', { filename, state });
       });
     });
   });
 }
 
 async function configureManagedSessions() {
-  await Promise.all(managedSessions().map(configureSession));
+  await Promise.all(
+    [...PARTITIONS.values()].map((partition) =>
+      configureSession(session.fromPartition(partition), partition)
+    )
+  );
 }
 
 async function clearManagedStorage() {
@@ -416,7 +537,10 @@ async function clearManagedStorage() {
  */
 async function activateProfile(profile, key) {
   activeProfileUuid = profile.uuid;
+  activeProfileKey = key || null;
   activeProfileName = profile.name || 'Anonymous';
+  activeProfileColor = profile.color || '';
+  activeProfileHasPin = Boolean(profile.hasPin);
   activeProfileIsHidden = Boolean(profile.hidden);
   // Reset vault to locked on every profile switch (feature #56 — prevent bleed)
   setVaultMode('locked');
@@ -429,26 +553,48 @@ async function activateProfile(profile, key) {
     tabSnapshotManager = createSnapshotManager(dir, key);
   }
 
-  // Wipe engine: schedule for this profile's containers
+  // Wipe engine: schedule with this profile's own interval (from encrypted
+  // prefs) so custom intervals survive profile switches instead of resetting
+  // to the 24h default
+  if (key) {
+    try {
+      const prefs = await profileManager.readPrefs(profile.uuid, key);
+      const ms = Number(prefs.wipeIntervalMs);
+      if (ms >= MIN_WIPE_MS && ms <= MAX_WIPE_MS) wipeIntervalMs = ms;
+    } catch {}
+  }
   const partitions = CONTAINERS.map((c) => `ram-${c}`);
-  wipeEngine.schedule(profile.uuid, partitions);
+  wipeEngine.schedule(profile.uuid, partitions, wipeIntervalMs);
 
-  // Notify renderer
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('profile:active', {
-      uuid: profile.uuid,
-      name: profile.name,
-      color: profile.color
-    });
+  // Notify every window bound to the global profile (isolated profile
+  // windows keep their own fixed profile)
+  sendGlobalProfileWindows('profile:active', {
+    uuid: profile.uuid,
+    name: profile.name,
+    color: profile.color
+  });
+
+  // Update the profile label in all live tabs of global-profile windows
+  // (patched Notification reads it at call time in the main world)
+  for (const ws of windows.values()) {
+    if (ws.profile) continue;
+    for (const view of ws.tabViews.values()) {
+      view.webContents.executeJavaScript(
+        `window.__RAM_PROFILE_LABEL__ = ${JSON.stringify(activeProfileName)};`
+      ).catch(() => {});
+    }
   }
 
-  // Flush queued notifications on profile switch (if not locked)
-  if (!isScreenLocked && notificationQueue.length) {
+  // Flush queued notifications on profile switch (no-op if locked or decoy)
+  if (notificationQueue.length) {
     flushNotificationQueue();
   }
 }
 
 function flushNotificationQueue() {
+  // Never display anything while locked or in ghost (decoy) mode — spec 6.14.
+  // Queued items are retained until a legitimate unlock flushes them.
+  if (isScreenLocked || activeProfileIsDecoy) return;
   if (!Notification.isSupported()) { notificationQueue.length = 0; return; }
   while (notificationQueue.length) {
     const { title, body } = notificationQueue.shift();
@@ -457,9 +603,13 @@ function flushNotificationQueue() {
 }
 
 function sendNotification(title, body) {
-  if (isScreenLocked || activeProfileIsDecoy) {
+  // Ghost (decoy) mode: hard-drop — never queue, never display (spec 6.14).
+  if (activeProfileIsDecoy) return;
+  if (isScreenLocked) {
     notificationQueue.push({ title, body });
-  } else if (Notification.isSupported()) {
+    return;
+  }
+  if (Notification.isSupported()) {
     try { new Notification({ title, body }).show(); } catch {}
   }
 }
@@ -508,10 +658,11 @@ function probeNetwork(url = 'https://www.google.com/generate_204') {
 // Webview hardening
 // ─────────────────────────────────────────────────────────────────────────────
 
-function hardenGuestWebContents(contents) {
+function hardenGuestWebContents(contents, ownerWin = null) {
   contents.setWindowOpenHandler(({ url }) => {
-    if (mainWindow && /^https?:\/\//i.test(url)) {
-      mainWindow.webContents.send('browser:new-tab-request', sanitiseUrl(url));
+    const target = ownerWin && !ownerWin.isDestroyed() ? ownerWin : mainWindow;
+    if (target && !target.isDestroyed() && /^https?:\/\//i.test(url)) {
+      target.webContents.send('browser:new-tab-request', sanitiseUrl(url));
     }
     return { action: 'deny' };
   });
@@ -524,18 +675,47 @@ function hardenGuestWebContents(contents) {
 // Window creation
 // ─────────────────────────────────────────────────────────────────────────────
 
-function createMainWindow() {
-  mainWindow = new BrowserWindow({
+/**
+ * Create a browser window.
+ *
+ * @param {object|null} profile — null: the window is bound to the globally
+ *   active profile and shares the global `ram-*` partitions (Chrome "New
+ *   Window" semantics: same profile ⇒ same session). Non-null: an ISOLATED
+ *   profile window — it gets its own namespaced in-memory partitions
+ *   (`ram-p<uuid8>-<container>`), fully separate storage from every other
+ *   window. Only PIN-less, non-hidden profiles may be opened this way
+ *   (opening via menu must never bypass PIN verification).
+ */
+async function createBrowserWindow(profile = null) {
+  const isPrimary = !profile && !mainWindow;
+
+  // Partition set for this window. Profile windows get namespaced partitions,
+  // configured through the exact same hardening path as the global ones.
+  let winPartitions;
+  if (profile) {
+    const ns = `ram-p${profile.uuid.slice(0, 8)}`;
+    winPartitions = new Map(CONTAINERS.map((c) => [c, `${ns}-${c}`]));
+    for (const partition of winPartitions.values()) extraPartitions.add(partition);
+    await Promise.all(
+      [...winPartitions.values()].map((partition) =>
+        configureSession(session.fromPartition(partition), partition)
+      )
+    );
+  } else {
+    winPartitions = PARTITIONS;
+  }
+
+  const win = new BrowserWindow({
     width: 1280,
     height: 840,
     minWidth: 900,
     minHeight: 620,
     frame: false,
     backgroundColor: '#0f0f11',
-    title: 'Ram Browser',
-    // Start hidden when VPN is required; show once WARP reports Connected.
-    // In dev mode (no requireWarp), show immediately.
-    show: !requireWarp,
+    title: profile ? `Ram Browser — ${profile.name}` : 'Ram Browser',
+    // Start hidden when VPN is required (primary only); show once WARP
+    // reports Connected. Secondary windows open from an already-running app.
+    show: !(isPrimary && requireWarp),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -547,19 +727,26 @@ function createMainWindow() {
     }
   });
 
-  // If VPN is required, show window only once WARP supervisor reports Connected.
-  // Fallback: show after 10 seconds regardless (prevents indefinite blank screen).
-  if (requireWarp) {
+  const winState = {
+    win,
+    profile: profile ? { uuid: profile.uuid, name: profile.name, color: profile.color } : null,
+    partitions: winPartitions,
+    tabViews: new Map()
+  };
+  windows.set(win.id, winState);
+  if (isPrimary) mainWindow = win;
+
+  // If VPN is required, show the primary window only once WARP reports
+  // Connected. Fallback: show after 10 seconds (prevents indefinite blank screen).
+  if (isPrimary && requireWarp) {
     const showTimer = setTimeout(() => {
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-        mainWindow.show();
-      }
+      if (!win.isDestroyed() && !win.isVisible()) win.show();
     }, 10_000);
 
     const onWarpStatus = (status) => {
-      if (status?.connected && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      if (status?.connected && !win.isDestroyed() && !win.isVisible()) {
         clearTimeout(showTimer);
-        mainWindow.show();
+        win.show();
         warpSupervisor.removeListener('status', onWarpStatus);
       }
     };
@@ -567,27 +754,37 @@ function createMainWindow() {
     // Also check immediately if already connected (dev mode with proxy configured)
     if (proxyUrl) {
       clearTimeout(showTimer);
-      mainWindow.show();
+      win.show();
     }
   }
 
-  // Screenshot protection
-  screenshotSecurity.attach(mainWindow, {
-    contentProtection: true,
-    lockOnSleep: true,
-    onLock: () => {
-      isScreenLocked = true;
-      // Suspend vault permissions on lock
-      setVaultMode('locked');
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('security:lock', { reason: 'sleep' });
+  // Screenshot protection. screenshotSecurity is a single-window module
+  // (module-level _window) — attach only the primary; secondary windows get
+  // the same content-protection guarantee directly.
+  if (isPrimary) {
+    screenshotSecurity.attach(win, {
+      contentProtection: true,
+      lockOnSleep: true,
+      onLock: () => {
+        // Suspend vault permissions on lock regardless of profile type
+        setVaultMode('locked');
+        // Only PIN-protected profiles get the PIN lock screen: a PIN-less
+        // profile has no credential to unlock with — locking it soft-locks
+        // the app and 5 failed PIN attempts trigger a panic wipe.
+        if (!activeProfileHasPin) return;
+        isScreenLocked = true;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('security:lock', { reason: 'sleep' });
+        }
       }
-    }
-  });
+    });
+  } else {
+    try { win.setContentProtection(true); } catch {}
+  }
 
-  mainWindow.webContents.on('will-attach-webview', (event, webPreferences, params) => {
-    const partition = params.partition || PARTITIONS.get('default');
-    if (![...PARTITIONS.values()].includes(partition)) {
+  win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
+    const partition = params.partition || winState.partitions.get('default');
+    if (![...winState.partitions.values()].includes(partition)) {
       event.preventDefault();
       return;
     }
@@ -602,13 +799,13 @@ function createMainWindow() {
     webPreferences.allowRunningInsecureContent = false;
   });
 
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
     return { action: 'deny' };
   });
 
   // Right-click context menu for the UI chrome (URL bar, settings inputs, etc.)
-  mainWindow.webContents.on('context-menu', (_e, params) => {
+  win.webContents.on('context-menu', (_e, params) => {
     const { isEditable, selectionText, editFlags } = params;
     if (!isEditable && !selectionText) return;
     const items = [];
@@ -621,24 +818,89 @@ function createMainWindow() {
     } else if (selectionText) {
       items.push({ label: 'Copy', role: 'copy', accelerator: 'CmdOrCtrl+C' });
     }
-    if (items.length) Menu.buildFromTemplate(items).popup({ window: mainWindow });
+    if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../../phantom-browser-ui.html'));
+  // Replay profile:active once the renderer is ready. For global windows the
+  // startup activation may predate the window; for profile windows this is
+  // how the renderer learns which (fixed) profile it hosts.
+  win.webContents.on('did-finish-load', () => {
+    if (win.isDestroyed()) return;
+    if (winState.profile) {
+      win.webContents.send('profile:active', { ...winState.profile });
+    } else if (activeProfileUuid) {
+      win.webContents.send('profile:active', {
+        uuid: activeProfileUuid,
+        name: activeProfileName,
+        color: activeProfileColor
+      });
+    }
+  });
+
+  // Cleanup on close: destroy this window's tab views, revoke their vault
+  // grants, and (for profile windows) clear the namespaced session storage.
+  win.on('closed', () => {
+    for (const [tabId, view] of winState.tabViews) {
+      try { view.webContents.removeAllListeners(); } catch {}
+      try { view.webContents.close(); } catch {}
+      revokeVaultGrant(`${win.id}:${tabId}`);
+    }
+    winState.tabViews.clear();
+    windows.delete(win.id);
+    if (winState.profile) {
+      const parts = [...winState.partitions.values()];
+      Promise.allSettled(parts.map(async (partition) => {
+        const s = session.fromPartition(partition);
+        await s.clearStorageData();
+        await s.clearCache();
+        await s.clearAuthCache();
+      })).finally(() => {
+        for (const partition of parts) extraPartitions.delete(partition);
+      });
+    }
+    if (win === mainWindow) mainWindow = null;
+  });
+
+  win.loadFile(path.join(__dirname, '../../phantom-browser-ui.html'));
+  return win;
+}
+
+function createMainWindow() {
+  return createBrowserWindow(null);
+}
+
+// Open an isolated window for a profile. Guard: PIN-protected and hidden
+// profiles are excluded — a menu click must never bypass PIN/phrase unlock.
+async function openProfileWindow(uuid) {
+  const profile = await profileManager.getProfile(uuid);
+  if (!profile || profile.hasPin || profile.hidden) return null;
+  return createBrowserWindow(profile);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tab views (WebContentsView) — one native view per browser tab
 // ─────────────────────────────────────────────────────────────────────────────
 
-const tabViews = new Map(); // tabId → WebContentsView
+// Map a renderer-supplied partition (always a global name like 'ram-work')
+// to the owning window's partition set. Clamps unknown values to the window's
+// default — an arbitrary partition string would create an unconfigured
+// session (no tracker blocking, no permission handlers).
+function resolvePartitionFor(ws, partition) {
+  if ([...ws.partitions.values()].includes(partition)) return partition;
+  const container = typeof partition === 'string' && partition.startsWith('ram-')
+    ? partition.slice(4)
+    : partition;
+  return ws.partitions.get(container) || ws.partitions.get('default');
+}
 
-function getOrCreateTabView(tabId, partition) {
-  if (tabViews.has(tabId)) return tabViews.get(tabId);
+function getOrCreateTabView(ws, tabId, partition) {
+  if (ws.tabViews.has(tabId)) return ws.tabViews.get(tabId);
 
+  const resolvedPartition = resolvePartitionFor(ws, partition);
+  const sendWin = (ch, payload) => { if (!ws.win.isDestroyed()) ws.win.webContents.send(ch, payload); };
   const view = new WebContentsView({
     webPreferences: {
-      partition: partition || 'ram-default',
+      partition: resolvedPartition,
       preload: path.join(__dirname, 'tab-preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
@@ -647,84 +909,78 @@ function getOrCreateTabView(tabId, partition) {
     }
   });
 
-  // Inject active profile label for notification prefixing (before page load)
-  view.webContents.on('dom-ready', () => {
-    const label = activeProfileName || '';
-    if (label) {
-      view.webContents.executeJavaScript(
-        `window.__RAM_PROFILE_LABEL__ = ${JSON.stringify(label)};`
-      ).catch(() => {});
-    }
-  });
+  // Profile label for notification prefixing is fetched synchronously by
+  // tab-preload.js (tabs:get-profile-label) — no dom-ready race.
 
-  // Forward navigation events to the UI renderer
+  // Forward navigation events to the owning window's UI renderer
   view.webContents.on('page-title-updated', (_e, title) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:title-updated', { tabId, title });
-    }
+    sendWin('tabview:title-updated', { tabId, title });
   });
 
   view.webContents.on('did-navigate', (_e, url) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:navigated', {
-        tabId, url,
-        canGoBack: view.webContents.canGoBack(),
-        canGoForward: view.webContents.canGoForward()
-      });
-    }
+    sendWin('tabview:navigated', {
+      tabId, url,
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward()
+    });
   });
 
   view.webContents.on('did-navigate-in-page', (_e, url) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:navigated', {
-        tabId, url,
-        canGoBack: view.webContents.canGoBack(),
-        canGoForward: view.webContents.canGoForward()
-      });
-    }
+    sendWin('tabview:navigated', {
+      tabId, url,
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward()
+    });
   });
 
   view.webContents.on('did-start-loading', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:load-change', { tabId, loading: true });
-    }
+    sendWin('tabview:load-change', { tabId, loading: true });
   });
 
   view.webContents.on('did-stop-loading', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:load-change', {
-        tabId,
-        loading: false,
-        url: view.webContents.getURL(),
-        title: view.webContents.getTitle(),
-        canGoBack: view.webContents.canGoBack(),
-        canGoForward: view.webContents.canGoForward()
-      });
-    }
+    sendWin('tabview:load-change', {
+      tabId,
+      loading: false,
+      url: view.webContents.getURL(),
+      title: view.webContents.getTitle(),
+      canGoBack: view.webContents.canGoBack(),
+      canGoForward: view.webContents.canGoForward()
+    });
   });
 
-  view.webContents.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL) => {
+  view.webContents.on('did-fail-load', (_e, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (errorCode === -3) return; // aborted (user navigated away)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:fail-load', { tabId, errorCode, errorDescription, url: validatedURL });
+
+    // HTTPS-only fallback: if OUR http→https upgrade failed at the TLS or
+    // connection layer, mark the host HTTP-only and retry over plain http.
+    // Never triggers for URLs the user/page explicitly requested as https.
+    if (isMainFrame && httpsOnlyEnabled && validatedURL?.startsWith('https://') && isHttpsFallbackError(errorCode)) {
+      try {
+        const { hostname } = new URL(validatedURL);
+        if (upgradedHosts.has(hostname) && !httpsExemptHosts.has(hostname)) {
+          httpsExemptHosts.add(hostname);
+          view.webContents.loadURL(validatedURL.replace(/^https:\/\//, 'http://')).catch(() => {});
+          return;
+        }
+      } catch {}
     }
+
+    sendWin('tabview:fail-load', { tabId, errorCode, errorDescription, url: validatedURL });
   });
 
   view.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url) && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('browser:new-tab-request', sanitiseUrl(url));
+    if (/^https?:\/\//i.test(url)) {
+      sendWin('browser:new-tab-request', sanitiseUrl(url));
     }
     return { action: 'deny' };
   });
 
   view.webContents.on('found-in-page', (_e, result) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('tabview:find-result', {
-        tabId,
-        activeMatchOrdinal: result.activeMatchOrdinal,
-        matches: result.matches
-      });
-    }
+    sendWin('tabview:find-result', {
+      tabId,
+      activeMatchOrdinal: result.activeMatchOrdinal,
+      matches: result.matches
+    });
   });
 
   // Right-click context menu for web page content
@@ -735,7 +991,7 @@ function getOrCreateTabView(tabId, partition) {
     // Link
     if (linkURL) {
       items.push(
-        { label: 'Open Link in New Tab', click: () => mainWindow?.webContents?.send('browser:new-tab-request', linkURL) },
+        { label: 'Open Link in New Tab', click: () => sendWin('browser:new-tab-request', linkURL) },
         { label: 'Copy Link Address',    click: () => clipboard.writeText(linkURL) },
         { type: 'separator' }
       );
@@ -773,22 +1029,54 @@ function getOrCreateTabView(tabId, partition) {
       { label: 'Copy Page URL', click: () => clipboard.writeText(pageURL || view.webContents.getURL()) }
     );
 
-    Menu.buildFromTemplate(items).popup({ window: mainWindow });
+    Menu.buildFromTemplate(items).popup({ window: ws.win });
   });
 
-  hardenGuestWebContents(view.webContents);
-  tabViews.set(tabId, view);
+  hardenGuestWebContents(view.webContents, ws.win);
+  view.__ramPartition = resolvedPartition; // for container-move detection in tabview:navigate
+  ws.tabViews.set(tabId, view);
   return view;
 }
 
-ipcMain.handle('tabview:navigate', (_e, { tabId, url, partition }) => {
-  const view = getOrCreateTabView(tabId, partition);
+// Detach + destroy a tab view owned by a window, revoking its vault grants
+function destroyTabView(ws, tabId) {
+  const view = ws.tabViews.get(tabId);
+  if (!view) return;
+  try {
+    if (!ws.win.isDestroyed() && ws.win.contentView?.children?.includes(view)) {
+      ws.win.contentView.removeChildView(view);
+    }
+  } catch {}
+  view.webContents.removeAllListeners();
+  try { view.webContents.close(); } catch {}
+  ws.tabViews.delete(tabId);
+  revokeVaultGrant(`${ws.win.id}:${tabId}`);
+}
+
+// Synchronous label fetch for tab-preload.js (runs before any page script).
+// Resolved per window: isolated profile windows report their own profile.
+ipcMain.on('tabs:get-profile-label', (e) => {
+  const ws = winStateForTabContents(e.sender);
+  e.returnValue = ws?.profile?.name ?? (activeProfileName || '');
+});
+
+ipcMain.handle('tabview:navigate', (e, { tabId, url, partition }) => {
+  const ws = winStateFor(e.sender);
+  if (!ws) return;
+  // Moving a tab between containers (spec 6.5): a WebContentsView's session
+  // partition is fixed at creation, so recreate the view in the new one.
+  const existing = ws.tabViews.get(tabId);
+  if (existing && partition && existing.__ramPartition !== resolvePartitionFor(ws, partition)) {
+    destroyTabView(ws, tabId);
+  }
+  const view = getOrCreateTabView(ws, tabId, partition);
   view.webContents.loadURL(url).catch(() => {});
 });
 
-ipcMain.handle('tabview:show', (_e, { tabId, bounds }) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  const view = tabViews.get(tabId);
+ipcMain.handle('tabview:show', (e, { tabId, bounds }) => {
+  const ws = winStateFor(e.sender);
+  if (!ws || ws.win.isDestroyed()) return;
+  const view = ws.tabViews.get(tabId);
   if (!view) return;
   const b = {
     x: Math.round(bounds.x),
@@ -796,57 +1084,52 @@ ipcMain.handle('tabview:show', (_e, { tabId, bounds }) => {
     width: Math.round(bounds.width),
     height: Math.round(bounds.height)
   };
-  if (!mainWindow.contentView.children.includes(view)) {
-    mainWindow.contentView.addChildView(view);
+  if (!ws.win.contentView.children.includes(view)) {
+    ws.win.contentView.addChildView(view);
   }
   view.setBounds(b);
 });
 
-ipcMain.handle('tabview:hide', (_e, tabId) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  const view = tabViews.get(tabId);
-  if (view && mainWindow.contentView.children.includes(view)) {
-    mainWindow.contentView.removeChildView(view);
+ipcMain.handle('tabview:hide', (e, tabId) => {
+  const ws = winStateFor(e.sender);
+  if (!ws || ws.win.isDestroyed()) return;
+  const view = ws.tabViews.get(tabId);
+  if (view && ws.win.contentView.children.includes(view)) {
+    ws.win.contentView.removeChildView(view);
   }
 });
 
-ipcMain.handle('tabview:close', (_e, tabId) => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  const view = tabViews.get(tabId);
-  if (!view) return;
-  // Remove from window FIRST, then remove all listeners, then close
-  try { if (mainWindow.contentView?.children?.includes(view)) mainWindow.contentView.removeChildView(view); } catch {}
-  view.webContents.removeAllListeners();
-  try { view.webContents.close(); } catch {}
-  tabViews.delete(tabId);
-  revokeVaultGrant(tabId);
+ipcMain.handle('tabview:close', (e, tabId) => {
+  const ws = winStateFor(e.sender);
+  if (!ws) return;
+  destroyTabView(ws, tabId);
 });
 
-ipcMain.handle('tabview:go-back', (_e, tabId) => {
-  tabViews.get(tabId)?.webContents.goBack();
+ipcMain.handle('tabview:go-back', (e, tabId) => {
+  winStateFor(e.sender)?.tabViews.get(tabId)?.webContents.goBack();
 });
 
-ipcMain.handle('tabview:go-forward', (_e, tabId) => {
-  tabViews.get(tabId)?.webContents.goForward();
+ipcMain.handle('tabview:go-forward', (e, tabId) => {
+  winStateFor(e.sender)?.tabViews.get(tabId)?.webContents.goForward();
 });
 
-ipcMain.handle('tabview:reload', (_e, tabId) => {
-  tabViews.get(tabId)?.webContents.reload();
+ipcMain.handle('tabview:reload', (e, tabId) => {
+  winStateFor(e.sender)?.tabViews.get(tabId)?.webContents.reload();
 });
 
-ipcMain.on('tabview:zoom-in',    (_e, tabId) => { const v = tabViews.get(tabId); if (v) v.webContents.setZoomLevel(v.webContents.getZoomLevel() + 0.5); });
-ipcMain.on('tabview:zoom-out',   (_e, tabId) => { const v = tabViews.get(tabId); if (v) v.webContents.setZoomLevel(v.webContents.getZoomLevel() - 0.5); });
-ipcMain.on('tabview:zoom-reset', (_e, tabId) => { tabViews.get(tabId)?.webContents.setZoomLevel(0); });
+ipcMain.on('tabview:zoom-in',    (e, tabId) => { const v = winStateFor(e.sender)?.tabViews.get(tabId); if (v) v.webContents.setZoomLevel(v.webContents.getZoomLevel() + 0.5); });
+ipcMain.on('tabview:zoom-out',   (e, tabId) => { const v = winStateFor(e.sender)?.tabViews.get(tabId); if (v) v.webContents.setZoomLevel(v.webContents.getZoomLevel() - 0.5); });
+ipcMain.on('tabview:zoom-reset', (e, tabId) => { winStateFor(e.sender)?.tabViews.get(tabId)?.webContents.setZoomLevel(0); });
 
-ipcMain.on('tabview:find', (_e, { tabId, text, forward }) => {
-  const v = tabViews.get(tabId);
+ipcMain.on('tabview:find', (e, { tabId, text, forward }) => {
+  const v = winStateFor(e.sender)?.tabViews.get(tabId);
   if (!v) return;
   if (!text) { v.webContents.stopFindInPage('clearSelection'); return; }
   v.webContents.findInPage(text, { forward: forward !== false, findNext: true });
 });
 
-ipcMain.on('tabview:find-stop', (_e, tabId) => {
-  tabViews.get(tabId)?.webContents.stopFindInPage('clearSelection');
+ipcMain.on('tabview:find-stop', (e, tabId) => {
+  winStateFor(e.sender)?.tabViews.get(tabId)?.webContents.stopFindInPage('clearSelection');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -861,8 +1144,21 @@ app.on('web-contents-created', (_event, contents) => {
 
 
 // ── Custom minimal menu bar ───────────────────────────────────────────────────
-function buildAppMenu() {
-  const send = (ch) => { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(ch); };
+function buildAppMenu(profiles = []) {
+  // Menu actions target the focused window so New Tab / Reload / etc. work in
+  // whichever window the user is using; fall back to the primary window.
+  const send = (ch) => {
+    const w = BrowserWindow.getFocusedWindow() || mainWindow;
+    if (w && !w.isDestroyed()) w.webContents.send(ch);
+  };
+  // Only PIN-less, non-hidden profiles can open from the menu — a menu click
+  // must never bypass PIN or unlock-phrase verification.
+  const profileWindowItems = profiles
+    .filter((p) => !p.hasPin && !p.hidden)
+    .map((p) => ({
+      label: p.name,
+      click: () => { openProfileWindow(p.uuid).catch(() => {}); }
+    }));
   const template = [
     {
       label: 'Ram Browser',
@@ -878,6 +1174,14 @@ function buildAppMenu() {
       label: 'File',
       submenu: [
         { label: 'New Tab', accelerator: 'CommandOrControl+T', click: () => send('menu:new-tab') },
+        { label: 'New Window', accelerator: 'CommandOrControl+N', click: () => { createBrowserWindow(null).catch(() => {}); } },
+        {
+          label: 'New Profile Window',
+          submenu: profileWindowItems.length
+            ? profileWindowItems
+            : [{ label: 'No PIN-less profiles', enabled: false }]
+        },
+        { type: 'separator' },
         { label: 'Close Tab', accelerator: 'CommandOrControl+W', click: () => send('menu:close-tab') }
       ]
     },
@@ -902,6 +1206,9 @@ function buildAppMenu() {
         { label: 'Zoom Out',   accelerator: 'CommandOrControl+-', click: () => send('menu:zoom-out') },
         { label: 'Actual Size', accelerator: 'CommandOrControl+0', click: () => send('menu:zoom-reset') },
         { type: 'separator' },
+        { label: 'Next Tab',     accelerator: 'Control+Tab',       click: () => send('menu:next-tab') },
+        { label: 'Previous Tab', accelerator: 'Control+Shift+Tab', click: () => send('menu:prev-tab') },
+        { type: 'separator' },
         { label: 'Toggle Full Screen', role: 'togglefullscreen' }
       ]
     },
@@ -911,7 +1218,7 @@ function buildAppMenu() {
         { label: 'Panic — Wipe Everything', accelerator: 'CommandOrControl+Shift+X', click: () => send('menu:panic') },
         { label: 'Lock Now', accelerator: 'CommandOrControl+Shift+L', click: () => send('menu:lock') },
         { label: 'Privacy Controls', accelerator: 'CommandOrControl+Shift+P', click: () => send('menu:privacy') },
-        { label: 'Screenshot Tool', accelerator: 'Ctrl+Shift+S', click: () => send('menu:screenshot') }
+        { label: 'Screenshot Tool', accelerator: 'CommandOrControl+Shift+S', click: () => send('menu:screenshot') }
       ]
     },
     {
@@ -927,8 +1234,18 @@ function buildAppMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
+// Rebuild the menu with the current profile list (call after any profile
+// create/update/delete so the New Profile Window submenu stays current)
+async function refreshAppMenu() {
+  try {
+    buildAppMenu(await profileManager.listProfiles());
+  } catch {
+    buildAppMenu();
+  }
+}
+
 app.whenReady().then(async () => {
-  // 0a. Set custom minimal menu bar
+  // 0a. Set custom minimal menu bar (rebuilt with profiles after init below)
   buildAppMenu();
 
   // 0. Register phantom:// protocol handler
@@ -955,36 +1272,27 @@ app.whenReady().then(async () => {
   // 2. Init profile manager (creates default profile if needed)
   await profileManager.init(app.getPath('userData'));
 
+  // Rebuild the menu now that profiles exist (New Profile Window submenu)
+  await refreshAppMenu();
+
   // 3. Activate default profile
   const activeProfile = await profileManager.getActiveProfile();
   if (activeProfile) {
-    // Resolve key for PIN-less profiles
-    const key = activeProfile.keyBase64
-      ? Buffer.from(activeProfile.keyBase64, 'base64')
-      : null;
+    // Resolve key for PIN-less profiles (OS keychain first, base64 fallback)
+    const key = await profileManager.resolveKey(activeProfile);
     await activateProfile(activeProfile, key);
   }
 
   // 4. Create window
   createMainWindow();
 
-  // Register global keyboard shortcut for panic (Cmd+Shift+X on macOS, Ctrl+Shift+X on Win/Linux)
+  // Register global keyboard shortcut for panic (Cmd+Shift+X on macOS, Ctrl+Shift+X on Win/Linux).
+  // Single panic path: performPanic() wipes in main (works even if the
+  // renderer is hung), then the renderer is told to reset its UI. The menu
+  // item's accelerator shows the same keys; when the app is focused this
+  // global shortcut intercepts them — both converge on performPanic().
   globalShortcut.register('CommandOrControl+Shift+X', async () => {
-    try {
-      clipboard.clear();
-      setVaultMode('locked');
-      isScreenLocked = false;
-      notificationQueue.length = 0;
-      await clearManagedStorage();
-      await Promise.allSettled(managedSessions().map((s) => s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })));
-      tabSnapshotManager?.clear().catch(() => {});
-      // Destroy all active WebContentsViews
-      for (const [, view] of tabViews) {
-        try { view.webContents.stop(); } catch {}
-        try { mainWindow?.contentView?.removeChildView(view); } catch {}
-      }
-      tabViews.clear();
-    } catch {}
+    try { await performPanic(); } catch {}
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('privacy:panic-triggered');
     }
@@ -992,21 +1300,19 @@ app.whenReady().then(async () => {
 
   // 5. Start wipe countdown ticker — attach listeners BEFORE startTick() to avoid missing first event
   wipeEngine.on('tick', (countdowns) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      const uuid = activeProfileUuid;
-      const seconds = uuid ? countdowns[uuid] : null;
-      mainWindow.webContents.send('wipe:countdown', {
-        seconds,
-        formatted: seconds != null ? formatCountdown(seconds) : '--:--:--'
-      });
-    }
+    const uuid = activeProfileUuid;
+    const seconds = uuid ? countdowns[uuid] : null;
+    sendGlobalProfileWindows('wipe:countdown', {
+      seconds,
+      formatted: seconds != null ? formatCountdown(seconds) : '--:--:--'
+    });
   });
 
   wipeEngine.startTick();
 
   wipeEngine.on('wiped', async ({ profileUuid }) => {
-    // Clear tab snapshot after wipe
-    tabSnapshotManager?.clear().catch(() => {});
+    // Spec 6.2: the tab snapshot survives the wipe cycle so tabs restore
+    // afterwards. Only panic / clear-all-data / ghost mode destroy it.
     notificationQueue.length = 0;
     resetPrivacyReport();
 
@@ -1015,9 +1321,7 @@ app.whenReady().then(async () => {
       s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })
     ));
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('wipe:done', { profileUuid });
-    }
+    sendGlobalProfileWindows('wipe:done', { profileUuid });
   });
 
   // 6. DNS leak verification — probe a well-known canary endpoint
@@ -1037,26 +1341,25 @@ app.whenReady().then(async () => {
   // 7. WARP supervisor (graceful if warp-cli not installed)
   warpSupervisor.start().catch(() => {});
   warpSupervisor.on('status', (status) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('warp:status', { ...warpStatus(), supervisor: status });
-    }
+    broadcast('warp:status', { ...warpStatus(), supervisor: status });
   });
   warpSupervisor.on('kill-switch', (active) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('warp:kill-switch', { active });
-      // Lock the screen when kill switch fires — VPN is dead, block access
-      if (active && !isScreenLocked) {
-        isScreenLocked = true;
-        mainWindow.webContents.send('security:lock', { reason: 'kill-switch' });
-      }
+    broadcast('warp:kill-switch', { active });
+    // Lock the screen when kill switch fires — VPN is dead, block access.
+    // PIN-less profiles are exempt (no credential to unlock with — the
+    // lock would be permanent and failed attempts trigger panic wipe);
+    // network is still blocked by requireWarp in onBeforeRequest.
+    // Lock UI only exists in the primary window (profile windows host
+    // PIN-less profiles by construction).
+    if (active && !isScreenLocked && activeProfileHasPin && mainWindow && !mainWindow.isDestroyed()) {
+      isScreenLocked = true;
+      mainWindow.webContents.send('security:lock', { reason: 'kill-switch' });
     }
   });
 
   // Periodic WARP status push (fallback when supervisor is silent) — 30s is enough
   warpStatusIntervalId = setInterval(() => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('warp:status', { ...warpStatus(), supervisor: warpSupervisor.getStatus() });
-    }
+    broadcast('warp:status', { ...warpStatus(), supervisor: warpSupervisor.getStatus() });
   }, 30_000);
   if (warpStatusIntervalId.unref) warpStatusIntervalId.unref();
 
@@ -1091,12 +1394,13 @@ app.on('before-quit', async (e) => {
 // IPC handlers
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Window controls
-ipcMain.on('window:close', () => mainWindow?.close());
-ipcMain.on('window:minimize', () => mainWindow?.minimize());
-ipcMain.on('window:toggle-maximize', () => {
-  if (!mainWindow) return;
-  mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize();
+// Window controls — always act on the window whose UI sent the event
+ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close());
+ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize());
+ipcMain.on('window:toggle-maximize', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return;
+  win.isMaximized() ? win.unmaximize() : win.maximize();
 });
 
 // Vault
@@ -1117,19 +1421,15 @@ function setVaultMode(mode, durationMs = VAULT_TIMED_MS) {
       vaultMode = 'locked';
       vaultTimedExpiry = null;
       vaultTimedTimer = null;
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('vault:mode-changed', { mode: 'locked', timedExpired: true });
-      }
+      broadcast('vault:mode-changed', { mode: 'locked', timedExpired: true });
     }, durationMs);
     if (vaultTimedTimer.unref) vaultTimedTimer.unref();
   }
 
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('vault:mode-changed', {
-      mode: vaultMode,
-      expiresAt: vaultTimedExpiry
-    });
-  }
+  broadcast('vault:mode-changed', {
+    mode: vaultMode,
+    expiresAt: vaultTimedExpiry
+  });
   return { mode: vaultMode, expiresAt: vaultTimedExpiry };
 }
 
@@ -1160,7 +1460,7 @@ ipcMain.handle('tor:enable', async () => {
     ...managedSessions().map((s) => s.setProxy(proxyConfig))
   ]).catch(() => {});
   proxyUrl = torUrl;
-  mainWindow?.webContents?.send('warp:status', warpStatus());
+  broadcast('warp:status', warpStatus());
   return { ok: true };
 });
 
@@ -1171,7 +1471,7 @@ ipcMain.handle('tor:disable', async () => {
     ...managedSessions().map((s) => s.setProxy(direct))
   ]).catch(() => {});
   proxyUrl = process.env.RAM_PROXY_URL || process.env.PHANTOM_PROXY_URL || '';
-  mainWindow?.webContents?.send('warp:status', warpStatus());
+  broadcast('warp:status', warpStatus());
   return { ok: true };
 });
 
@@ -1192,7 +1492,7 @@ ipcMain.handle('vpn:set-proxy', async (_e, url) => {
     ...managedSessions().map((s) => s.setProxy(proxyConfig))
   ]).catch(() => {});
   proxyUrl = url;
-  mainWindow?.webContents?.send('warp:status', warpStatus());
+  broadcast('warp:status', warpStatus());
   return { ok: true };
 });
 
@@ -1203,7 +1503,7 @@ ipcMain.handle('vpn:disconnect', async () => {
     ...managedSessions().map((s) => s.setProxy(direct))
   ]).catch(() => {});
   proxyUrl = '';
-  mainWindow?.webContents?.send('warp:status', warpStatus());
+  broadcast('warp:status', warpStatus());
   return { ok: true };
 });
 
@@ -1239,7 +1539,9 @@ ipcMain.handle('privacy:clear-all-data', async () => {
   return { ok: true };
 });
 
-ipcMain.handle('privacy:panic', async () => {
+// Shared panic implementation — the ONLY wipe-everything path
+// (global shortcut, menu, and privacy:panic IPC all converge here).
+async function performPanic() {
   clipboard.clear();
   setVaultMode('locked');   // force vault to locked on panic
   isScreenLocked = false;   // panic resets lock state (UI wiped)
@@ -1248,12 +1550,20 @@ ipcMain.handle('privacy:panic', async () => {
   // Revoke push subscriptions — clear service workers in all sessions
   await Promise.allSettled(managedSessions().map((s) => s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })));
   tabSnapshotManager?.clear().catch(() => {});
-  // Destroy all active WebContentsViews
-  for (const [, view] of tabViews) {
-    try { view.webContents.stop(); } catch {}
-    try { mainWindow?.contentView?.removeChildView(view); } catch {}
+  // Destroy all active WebContentsViews in every window
+  for (const ws of windows.values()) {
+    for (const view of ws.tabViews.values()) {
+      try { view.webContents.stop(); } catch {}
+      try { if (!ws.win.isDestroyed()) ws.win.contentView?.removeChildView(view); } catch {}
+    }
+    ws.tabViews.clear();
   }
-  tabViews.clear();
+  // Close isolated profile windows — panic leaves nothing on screen
+  closeProfileWindows();
+}
+
+ipcMain.handle('privacy:panic', async () => {
+  await performPanic();
   return { ok: true };
 });
 
@@ -1267,14 +1577,17 @@ ipcMain.handle('wipe:trigger-now', async () => {
   if (!activeProfileUuid) return { ok: false };
   const partitions = CONTAINERS.map((c) => `ram-${c}`);
   await wipeEngine.wipeNow(activeProfileUuid, partitions);
-  tabSnapshotManager?.clear().catch(() => {});
+  // Snapshot intentionally preserved — same wipe cycle as the scheduled
+  // wipe (spec 6.2: tabs restore after wipe)
   return { ok: true };
 });
 
-// Per-container wipe
-ipcMain.handle('wipe:container', async (_e, { container }) => {
+// Per-container wipe — wipes the SENDER window's container partition
+// (an isolated profile window wipes its own namespaced session)
+ipcMain.handle('wipe:container', async (e, { container }) => {
   if (!CONTAINERS.includes(container)) return { ok: false, reason: 'unknown_container' };
-  const partition = `ram-${container}`;
+  const ws = winStateFor(e.sender);
+  const partition = ws?.partitions.get(container) || `ram-${container}`;
   try {
     const s = session.fromPartition(partition);
     const storageTypes = ['cookies','filesystem','indexdb','localstorage','shadercache','websql','serviceworkers','cachestorage'];
@@ -1282,13 +1595,6 @@ ipcMain.handle('wipe:container', async (_e, { container }) => {
     await s.clearCache();
     await s.clearAuthCache();
     await s.clearHostResolverCache();
-    // Revoke vault grants for all tabs running in this container
-    for (const [tid, view] of tabViews) {
-      try {
-        const url = view.webContents.getURL();
-        if (url && session.fromPartition(partition) === view.webContents.session) revokeVaultGrant(tid);
-      } catch {}
-    }
     vaultGrantedOrigins.clear(); // clear all grants — safest after a container wipe
     return { ok: true, container };
   } catch (err) {
@@ -1306,13 +1612,21 @@ ipcMain.handle('wipe:get-interval', () => ({
   hours: wipeIntervalMs / (60 * 60 * 1000)
 }));
 
-ipcMain.handle('wipe:set-interval', (_e, { hours }) => {
+ipcMain.handle('wipe:set-interval', async (_e, { hours }) => {
   const clampedH = Math.min(7 * 24, Math.max(1, Number(hours) || 24));
   wipeIntervalMs = clampedH * 60 * 60 * 1000;
   // Reschedule the active profile timer with new interval
   if (activeProfileUuid) {
     const partitions = CONTAINERS.map((c) => `ram-${c}`);
     wipeEngine.schedule(activeProfileUuid, partitions, wipeIntervalMs);
+    // Persist per-profile so the interval survives switches and restarts
+    if (activeProfileKey) {
+      try {
+        const prefs = await profileManager.readPrefs(activeProfileUuid, activeProfileKey);
+        prefs.wipeIntervalMs = wipeIntervalMs;
+        await profileManager.writePrefs(activeProfileUuid, prefs, activeProfileKey);
+      } catch {}
+    }
   }
   return { ok: true, hours: clampedH };
 });
@@ -1331,6 +1645,7 @@ ipcMain.handle('profiles:list', async () => {
 
 ipcMain.handle('profiles:create', async (_e, opts) => {
   const profile = await profileManager.createProfile(opts);
+  refreshAppMenu().catch(() => {});
   return { uuid: profile.uuid, name: profile.name, color: profile.color };
 });
 
@@ -1347,9 +1662,14 @@ ipcMain.handle('profiles:switch', async (_e, { uuid, pin }) => {
     activeProfileIsDecoy = true;
     try {
       setVaultMode('locked');
+      // Duress: no real-profile data may remain visible in another window
+      closeProfileWindows();
       await clearManagedStorage();
       tabSnapshotManager?.clear().catch(() => {});
       clipboard.clear();
+      // Drop queued real-profile notifications — nothing may replay in or
+      // after ghost mode (spec 6.14)
+      notificationQueue.length = 0;
     } catch {}
     await activateProfile(result.profile, result.key);
     // Notify renderer to activate ghost mode UI
@@ -1370,7 +1690,10 @@ ipcMain.handle('profiles:switch', async (_e, { uuid, pin }) => {
   }
 });
 
-ipcMain.handle('profiles:active', async () => {
+ipcMain.handle('profiles:active', async (e) => {
+  // Isolated profile windows report their own fixed profile, not the global one
+  const ws = winStateFor(e.sender);
+  if (ws?.profile) return { ...ws.profile };
   const profile = await profileManager.getActiveProfile();
   if (!profile) return null;
   return { uuid: profile.uuid, name: profile.name, color: profile.color };
@@ -1378,14 +1701,21 @@ ipcMain.handle('profiles:active', async () => {
 
 ipcMain.handle('profiles:update', async (_e, { uuid, updates }) => {
   await profileManager.updateProfile(uuid, updates);
+  refreshAppMenu().catch(() => {});
   return { ok: true };
 });
+
+// Resolve a profile's prefs key. PIN-derived keys can't be re-derived without
+// the PIN, so for the active (unlocked) profile use the cached session key.
+async function keyForProfile(profile) {
+  if (profile.uuid === activeProfileUuid && activeProfileKey) return activeProfileKey;
+  return profileManager.resolveKey(profile);
+}
 
 ipcMain.handle('profiles:get-prefs', async (_e, { uuid }) => {
   const profile = await profileManager.getProfile(uuid);
   if (!profile) return null;
-  // Key may be in index (PIN-less profiles)
-  const key = profile.keyBase64 ? Buffer.from(profile.keyBase64, 'base64') : null;
+  const key = await keyForProfile(profile);
   if (!key) return null;
   return profileManager.readPrefs(uuid, key);
 });
@@ -1393,7 +1723,7 @@ ipcMain.handle('profiles:get-prefs', async (_e, { uuid }) => {
 ipcMain.handle('profiles:set-homepage', async (_e, { uuid, url }) => {
   const profile = await profileManager.getProfile(uuid);
   if (!profile) return { ok: false };
-  const key = profile.keyBase64 ? Buffer.from(profile.keyBase64, 'base64') : null;
+  const key = await keyForProfile(profile);
   if (!key) return { ok: false };
   const prefs = await profileManager.readPrefs(uuid, key);
   prefs.homepageUrl = url || null;
@@ -1404,7 +1734,7 @@ ipcMain.handle('profiles:set-homepage', async (_e, { uuid, url }) => {
 ipcMain.handle('profiles:get-homepage', async (_e, { uuid }) => {
   const profile = await profileManager.getProfile(uuid);
   if (!profile) return { url: null };
-  const key = profile.keyBase64 ? Buffer.from(profile.keyBase64, 'base64') : null;
+  const key = await keyForProfile(profile);
   if (!key) return { url: null };
   const prefs = await profileManager.readPrefs(uuid, key);
   return { url: prefs.homepageUrl || null };
@@ -1432,6 +1762,11 @@ ipcMain.handle('profiles:unlock-hidden', async (_e, { phrase }) => {
 
 ipcMain.handle('profiles:delete', async (_e, uuid) => {
   await profileManager.deleteProfile(uuid);
+  refreshAppMenu().catch(() => {});
+  // Close any open isolated window for the deleted profile
+  for (const ws of [...windows.values()]) {
+    if (ws.profile?.uuid === uuid) { try { ws.win.close(); } catch {} }
+  }
   return { ok: true };
 });
 
@@ -1443,8 +1778,44 @@ ipcMain.handle('pin:verify', async (_e, { uuid, pin }) => {
 
 ipcMain.handle('pin:set', async (_e, { uuid, pin }) => {
   const dir = profileManager.profileDir(uuid);
+  const profile = await profileManager.getProfile(uuid);
+  if (!profile) return { ok: false, error: 'Profile not found' };
+
+  // Read prefs under the CURRENT key before it is destroyed — otherwise the
+  // next unlock derives a PIN key that can't decrypt them and healPrefs
+  // silently resets homepage/wipe-interval to defaults.
+  let prefs = null;
+  const oldKey = (uuid === activeProfileUuid && activeProfileKey)
+    ? activeProfileKey
+    : await profileManager.resolveKey(profile);
+  if (oldKey) {
+    try { prefs = await profileManager.readPrefs(uuid, oldKey); } catch {}
+  }
+
   await setPin(dir, pin);
-  await profileManager.updateProfile(uuid, { hasPin: true });
+
+  // Re-encrypt prefs under the PIN-derived key and destroy the stored key
+  // material — leaving keySafe/keyBase64 in the index would let anyone
+  // recover the profile key without the PIN (defeats PIN-at-rest protection).
+  const newKey = await deriveProfileKey(dir, pin);
+  if (prefs && Object.keys(prefs).length) {
+    await profileManager.writePrefs(uuid, prefs, newKey);
+  }
+  await profileManager.updateProfile(uuid, { hasPin: true, keySafe: null, keyBase64: null });
+
+  // Keep the live session working with the new key
+  if (uuid === activeProfileUuid) {
+    activeProfileKey = newKey;
+    activeProfileHasPin = true;
+    tabSnapshotManager = createSnapshotManager(dir, newKey);
+  }
+
+  // Profile gained a PIN — it must leave the New Profile Window submenu,
+  // and any open isolated window for it must close (PIN-less-only invariant).
+  refreshAppMenu().catch(() => {});
+  for (const ws of [...windows.values()]) {
+    if (ws.profile?.uuid === uuid) { try { ws.win.close(); } catch {} }
+  }
   return { ok: true };
 });
 
@@ -1470,12 +1841,16 @@ ipcMain.on('security:screen-unlocked', () => {
   flushNotificationQueue();
 });
 
-// Tab snapshot
-ipcMain.on('tabs:snapshot', (_e, { tabs, activeIndex }) => {
+// Tab snapshot — primary window only. Secondary windows (same-profile "New
+// Window" or isolated profile windows) must neither clobber nor restore the
+// primary window's snapshot.
+ipcMain.on('tabs:snapshot', (e, { tabs, activeIndex }) => {
+  if (BrowserWindow.fromWebContents(e.sender) !== mainWindow) return;
   tabSnapshotManager?.write(tabs, activeIndex);
 });
 
-ipcMain.handle('tabs:restore', async () => {
+ipcMain.handle('tabs:restore', async (e) => {
+  if (BrowserWindow.fromWebContents(e.sender) !== mainWindow) return null;
   if (!tabSnapshotManager) return null;
   return tabSnapshotManager.read();
 });

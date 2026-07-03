@@ -120,6 +120,44 @@ test('switchProfile throws for a nonexistent UUID', async () => {
   );
 });
 
+// ── PIN-profile prefs (bug #2: key derived from PIN, self-heal) ───────────────
+
+test('PIN profile prefs are readable with the unlock key', async () => {
+  const p = await manager.createProfile({ name: 'PinPrefs', pin: '424242' });
+  const result = await manager.switchProfile(p.uuid, '424242');
+  assert.equal(result.result, 'ok');
+  const prefs = await manager.readPrefs(p.uuid, result.key);
+  assert.equal(prefs.name, 'PinPrefs');
+  assert.equal(prefs.rememberTabs, true);
+});
+
+test('healPrefs regenerates prefs encrypted under a lost key', async () => {
+  const p = await manager.createProfile({ name: 'HealMe', pin: '111111' });
+  // Simulate a pre-fix profile: prefs.enc encrypted under a random, lost key
+  const { generateKey, encryptJson } = require('../src/main/profiles/encryption');
+  const lostKey = generateKey();
+  const prefsPath = path.join(manager.profileDir(p.uuid), 'prefs.enc');
+  await fs.writeFile(prefsPath, encryptJson({ name: 'unreachable' }, lostKey));
+
+  const result = await manager.switchProfile(p.uuid, '111111');
+  assert.equal(result.result, 'ok');
+  // Unlock must have healed prefs under the PIN-derived key
+  const prefs = await manager.readPrefs(p.uuid, result.key);
+  assert.equal(prefs.name, 'HealMe');
+});
+
+test('healPrefs leaves readable prefs untouched', async () => {
+  const p = await manager.createProfile({ name: 'NoHeal', pin: '222222' });
+  const first = await manager.switchProfile(p.uuid, '222222');
+  const prefs = await manager.readPrefs(p.uuid, first.key);
+  prefs.homepageUrl = 'https://example.com';
+  await manager.writePrefs(p.uuid, prefs, first.key);
+
+  const second = await manager.switchProfile(p.uuid, '222222');
+  const after = await manager.readPrefs(p.uuid, second.key);
+  assert.equal(after.homepageUrl, 'https://example.com'); // not reset to defaults
+});
+
 // ── deleteProfile ─────────────────────────────────────────────────────────────
 
 test('deleteProfile removes the profile from the list', async () => {

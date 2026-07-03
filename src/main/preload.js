@@ -234,5 +234,7 @@ contextBridge.exposeInMainWorld('phantom', {
     onZoomIn:     (cb) => ipcRenderer.on('menu:zoom-in',     (_e) => cb()),
     onZoomOut:    (cb) => ipcRenderer.on('menu:zoom-out',    (_e) => cb()),
     onZoomReset:  (cb) => ipcRenderer.on('menu:zoom-reset',  (_e) => cb()),
+    onNextTab:    (cb) => ipcRenderer.on('menu:next-tab',    (_e) => cb()),
+    onPrevTab:    (cb) => ipcRenderer.on('menu:prev-tab',    (_e) => cb()),
   }
 });

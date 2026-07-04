@@ -12,18 +12,24 @@
 const { test, expect } = require('@playwright/test');
 const { _electron: electron } = require('playwright');
 const path = require('node:path');
+const fs = require('node:fs');
+const os = require('node:os');
 
 const APP_ENTRY = path.join(__dirname, '../../src/main/index.js');
 
 let electronApp;
 let window;
+let scratchDir;
 
 test.beforeAll(async () => {
+  // Scratch userData so tests never touch real profiles/prefs.
+  scratchDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ram-e2e-'));
   electronApp = await electron.launch({
     args: [APP_ENTRY],
     env: {
       ...process.env,
       NODE_ENV: 'test',
+      RAM_USER_DATA: scratchDir,
       // Disable WARP requirement so tests don't block
       RAM_REQUIRE_WARP: '0'
     }
@@ -36,6 +42,7 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await electronApp?.close();
+  if (scratchDir) fs.rmSync(scratchDir, { recursive: true, force: true });
 });
 
 // ── Dashboard renders ────────────────────────────────────────────────────────
@@ -70,16 +77,21 @@ test('can open a new tab', async () => {
 
 // ── Profile switcher ─────────────────────────────────────────────────────────
 
-test('profile switcher button is visible', async () => {
-  const profileBtn = window.locator('#profileBtn, .profile-btn, [data-profile-switcher]').first();
-  await expect(profileBtn).toBeVisible({ timeout: 5000 });
+test('profile switcher is reachable via the shield panel', async () => {
+  await window.click('#btnPrivacy');
+  await expect(window.locator('#activeProfileName')).toBeVisible({ timeout: 5000 });
+  await expect(window.locator('#newProfileBtn')).toBeVisible();
+  await window.keyboard.press('Escape');
+  await window.click('body', { position: { x: 5, y: 300 } }).catch(() => {});
 });
 
 // ── Security features ─────────────────────────────────────────────────────────
 
-test('vault button is present', async () => {
-  const vaultBtn = window.locator('#vaultBtn, .vault-btn, [data-vault]').first();
-  await expect(vaultBtn).toBeVisible({ timeout: 5000 });
+test('vault controls are present in the shield panel', async () => {
+  await window.click('#btnPrivacy');
+  await expect(window.locator('.vault-state-bar')).toBeVisible({ timeout: 5000 });
+  await expect(window.locator('#lockVaultItem')).toBeVisible();
+  await window.click('body', { position: { x: 5, y: 300 } }).catch(() => {});
 });
 
 test('screenshot shortcut is registered', async () => {

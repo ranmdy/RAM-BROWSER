@@ -708,9 +708,14 @@ async function createBrowserWindow(profile = null) {
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
-    minWidth: 900,
-    minHeight: 620,
-    frame: false,
+    // Small enough that macOS Fill & Arrange can tile four windows into
+    // screen quadrants on a laptop display (900x620 forced overlap).
+    minWidth: 500,
+    minHeight: 400,
+    // Native macOS traffic lights (with the system Move & Resize / tiling
+    // menu) inset into the custom toolbar; no title bar chrome.
+    titleBarStyle: 'hidden',
+    trafficLightPosition: { x: 14, y: 13 },
     backgroundColor: '#0f0f11',
     title: profile ? `Ram Browser — ${profile.name}` : 'Ram Browser',
     // Start hidden when VPN is required (primary only); show once WARP
@@ -836,6 +841,11 @@ async function createBrowserWindow(profile = null) {
       });
     }
   });
+
+  // Let the renderer collapse the traffic-light gutter in native fullscreen
+  // (the system buttons auto-hide there).
+  win.on('enter-full-screen', () => { if (!win.isDestroyed()) win.webContents.send('window:fullscreen', true); });
+  win.on('leave-full-screen', () => { if (!win.isDestroyed()) win.webContents.send('window:fullscreen', false); });
 
   // Cleanup on close: destroy this window's tab views, revoke their vault
   // grants, and (for profile windows) clear the namespaced session storage.
@@ -1393,15 +1403,6 @@ app.on('before-quit', async (e) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC handlers
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Window controls — always act on the window whose UI sent the event
-ipcMain.on('window:close', (e) => BrowserWindow.fromWebContents(e.sender)?.close());
-ipcMain.on('window:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize());
-ipcMain.on('window:toggle-maximize', (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win) return;
-  win.isMaximized() ? win.unmaximize() : win.maximize();
-});
 
 // Vault
 const VAULT_TIMED_MS = 5 * 60 * 1000; // 5-minute timed grant

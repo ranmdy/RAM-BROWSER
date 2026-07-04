@@ -260,17 +260,10 @@ select { font: inherit; }
 }
 .toolbar > * { -webkit-app-region: no-drag; }
 
-/* Traffic lights */
-.traffic-lights { display: flex; gap: 8px; margin-right: 4px; flex-shrink: 0; }
-.tl-dot {
-  width: 12px; height: 12px; border-radius: 50%;
-  cursor: pointer; flex-shrink: 0;
-  transition: filter 0.15s;
-}
-.tl-dot:hover { filter: brightness(1.15); }
-.tl-close { background: #ff5f57; }
-.tl-min   { background: #febc2e; }
-.tl-max   { background: #28c840; }
+/* Native macOS traffic lights are inset at x:14 — reserve space for them.
+   In native fullscreen the system buttons auto-hide, so collapse the gutter. */
+.toolbar { padding-left: 78px; }
+body.fullscreen .toolbar { padding-left: 8px; }
 
 /* Toolbar icon button */
 .tb-icon {
@@ -292,6 +285,7 @@ select { font: inherit; }
 /* URL capsule (wider, Safari proportions) */
 .url-capsule {
   flex: 1;
+  min-width: 0; /* allow shrink at narrow (tiled) window widths */
   display: flex; align-items: center; gap: 7px;
   height: 26px;
   max-width: 760px;
@@ -988,13 +982,6 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
        ● ● ●  [⊟]  [‹][›]  🔒 url capsule ↻  [💬][🛡][⚡]
        ═══════════════════════════════════════════════════════ -->
   <div class="toolbar">
-    <!-- Traffic lights -->
-    <div class="traffic-lights">
-      <span class="tl-dot tl-close" id="btnClose"></span>
-      <span class="tl-dot tl-min"   id="btnMin"></span>
-      <span class="tl-dot tl-max"   id="btnMax"></span>
-    </div>
-
     <!-- Back / Forward (flat, no pill) -->
     <div class="nav-pill">
       <button class="tb-icon" id="btnBack" data-tip="Back">
@@ -2570,9 +2557,8 @@ $('#btnBack').addEventListener('click', () => { const t = activeTab(); if (t?.ur
 $('#btnForward').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.goForward(t.id); });
 $('#btnReload').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.reload(t.id); });
 
-$('#btnClose').addEventListener('click', () => window.phantom?.window?.close());
-$('#btnMin').addEventListener('click', () => window.phantom?.window?.minimize());
-$('#btnMax').addEventListener('click', () => window.phantom?.window?.toggleMaximize());
+// Collapse the native traffic-light gutter while in macOS fullscreen
+window.phantom?.window?.onFullScreen?.((on) => document.body.classList.toggle('fullscreen', on));
 
 
 $('#screenshotPanelBtn').addEventListener('click', () => { closeAllPopovers(); takeScreenshot(); });

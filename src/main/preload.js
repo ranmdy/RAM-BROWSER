@@ -4,11 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('phantom', {
 
-  // ── window controls ─────────────────────────────────────────────────────────
+  // ── window state ─────────────────────────────────────────────────────────────
   window: {
-    close:          () => ipcRenderer.send('window:close'),
-    minimize:       () => ipcRenderer.send('window:minimize'),
-    toggleMaximize: () => ipcRenderer.send('window:toggle-maximize')
+    onFullScreen: (cb) => ipcRenderer.on('window:fullscreen', (_e, on) => cb(on))
   },
 
   // ── privacy / panic ─────────────────────────────────────────────────────────

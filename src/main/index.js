@@ -1563,11 +1563,16 @@ function performPanic() {
     // Revoke push subscriptions — clear service workers in all sessions
     await Promise.allSettled(managedSessions().map((s) => s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })));
     tabSnapshotManager?.clear().catch(() => {});
-    // Destroy all active WebContentsViews in every window
+    // Destroy all active WebContentsViews in every window. Detaching is not
+    // enough — webContents.stop() only halts loading, so media (e.g. YouTube
+    // audio) keeps playing in the orphaned view. Close the webContents like
+    // the normal tab-close path does, and revoke its vault grant.
     for (const ws of windows.values()) {
-      for (const view of ws.tabViews.values()) {
-        try { view.webContents.stop(); } catch {}
+      for (const [tabId, view] of ws.tabViews) {
+        try { view.webContents.removeAllListeners(); } catch {}
         try { if (!ws.win.isDestroyed()) ws.win.contentView?.removeChildView(view); } catch {}
+        try { view.webContents.close(); } catch {}
+        revokeVaultGrant(`${ws.win.id}:${tabId}`);
       }
       ws.tabViews.clear();
     }

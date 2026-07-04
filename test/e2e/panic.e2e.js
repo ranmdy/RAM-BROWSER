@@ -154,3 +154,43 @@ test('main-process panic path (menu accelerator equivalent) resets all windows a
     expect(await p.locator('#urlInput').inputValue(), `window ${i} url bar`).toBe('');
   }
 });
+
+test('panic destroys tab WebContents (no orphaned media playback)', async () => {
+  const pages = electronApp.windows();
+  const allWebContentsCount = () =>
+    electronApp.evaluate(({ webContents }) =>
+      webContents.getAllWebContents().filter((wc) => !wc.isDestroyed()).length
+    );
+
+  const baseline = await allWebContentsCount();
+
+  // Navigate two real tab views in window 0 (data: URLs — offline-safe)
+  await pages[0].evaluate(() => {
+    for (let i = 0; i < 2; i++) {
+      const t = createTab({ active: true });
+      phantom.tabViews.navigate(
+        t.id,
+        `data:text/html,<title>leak-probe-${i}</title><h1>leak probe</h1>`,
+        partitionByContainer[t.container] || partitionByContainer.default
+      );
+    }
+  });
+  await expect.poll(allWebContentsCount, { timeout: 10000 }).toBe(baseline + 2);
+
+  // Panic from a DIFFERENT window
+  await pages[1].evaluate(() => triggerPanic());
+
+  // The two tab WebContents must be destroyed, not just detached —
+  // an orphaned webContents is exactly what keeps audio playing.
+  await expect.poll(allWebContentsCount, { timeout: 10000 }).toBe(baseline);
+
+  // And every surviving webContents is a UI shell, not a page
+  const urls = await electronApp.evaluate(({ webContents }) =>
+    webContents.getAllWebContents().filter((wc) => !wc.isDestroyed()).map((wc) => wc.getURL())
+  );
+  for (const u of urls) expect(u).not.toContain('leak-probe');
+
+  for (const p of pages) {
+    await expect(p.locator('.tab')).toHaveCount(1, { timeout: 10000 });
+  }
+});

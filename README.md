@@ -16,6 +16,9 @@ Desktop browser built on Electron. Routes all traffic through Cloudflare WARP, w
 - Fingerprint hardening — canvas noise, audio noise, spoofed hardware concurrency and memory, font enumeration blocked.
 - Tracker/ad blocking via request interception (~50 domains).
 - HTTPS-only mode, WebRTC leak protection, optional Tor routing.
+- Multi-window: `Cmd+N` opens a new window; File → New Profile Window opens a PIN-less profile in its own window with fully isolated, in-memory sessions.
+- Minimal start page — just search and a one-line privacy status; all controls live in the shield panel and Settings.
+- Native macOS window chrome: real traffic lights with Move & Resize / Fill & Arrange tiling support.
 
 ## Install
 

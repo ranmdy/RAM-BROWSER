@@ -478,95 +478,49 @@ body.fullscreen .toolbar { padding-left: 8px; }
 /* ══════════════════════════════════════════════════════════════
    DASHBOARD
    ══════════════════════════════════════════════════════════════ */
+/* Safari-style start page: one centered column, search front and center,
+   a single muted status strip below. Everything else lives in the shield
+   panel or Settings. */
 .dashboard {
   position: absolute; inset: 0;
   overflow-y: auto; overflow-x: hidden;
-  z-index: 1; padding: 28px 24px;
+  z-index: 1; padding: 24px;
+  display: flex; align-items: center; justify-content: center;
 }
 .dashboard.hidden { display: none; }
 
-.dash-grid {
-  display: grid; grid-template-columns: 1fr 280px;
-  gap: 16px; max-width: 960px; margin: 0 auto 18px;
+.dash-center {
+  width: min(560px, 100%);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 22px;
+  margin-top: -6vh; /* optical center, slightly above true center */
 }
-.hero-panel {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-xl); padding: 26px 26px 22px;
+.dash-profile {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
 }
-.hero-kicker { font-size: 11px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
-.hero-panel h1 { font-size: 20px; font-weight: 700; line-height: 1.3; margin-bottom: 10px; }
-.hero-panel > p { color: var(--text-2); font-size: 13px; line-height: 1.55; margin-bottom: 18px; }
 .dash-search {
-  display: flex; align-items: center; gap: 10px;
-  height: 36px; padding: 0 14px;
-  background: var(--surface-2); border: 1px solid var(--glass-border);
+  width: 100%;
+  display: flex; align-items: center; gap: 12px;
+  height: 44px; padding: 0 18px;
+  background: var(--surface); border: 1px solid var(--glass-border);
   border-radius: var(--r-full);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .dash-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-s); }
-.dash-search input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 13px; }
+.dash-search input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 14px; }
 .dash-search input::placeholder { color: var(--text-3); }
 
-.status-card {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-xl); padding: 20px;
+.dash-status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-3);
+  background: none; border: 0; cursor: pointer;
+  padding: 6px 12px; border-radius: var(--r-full);
+  transition: background 0.15s, color 0.15s;
 }
-.status-card h2 { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.05em; }
-.status-line { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--glass-border); }
-.status-line:last-child { border-bottom: none; }
-.status-line span { color: var(--text-2); }
-.status-line strong { color: var(--text); font-weight: 600; }
-#dashWipe { color: var(--accent); font-family: var(--mono); }
-
-.metric-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 12px; max-width: 960px; margin: 0 auto 16px;
-}
-.metric-card {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-lg); padding: 16px;
-}
-.metric-label  { font-size: 10px; color: var(--text-3); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-.metric-value  { font-size: 20px; font-weight: 700; }
-.metric-value.green  { color: var(--green); }
-.metric-value.violet { color: var(--accent); }
-.metric-value.yellow { color: var(--yellow); }
-.metric-value.red    { color: var(--red); }
-.metric-detail { font-size: 11px; color: var(--text-3); margin-top: 4px; }
-
-.privacy-report {
-  background: var(--surface);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--r-xl); padding: 20px;
-  max-width: 960px; margin: 0 auto 16px;
-}
-.privacy-report h3 { font-size: 13px; font-weight: 650; margin-bottom: 14px; }
-.report-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--glass-border);
-  border-radius: var(--r-md);
-  overflow: hidden;
-}
-.report-stat {
-  background: var(--surface);
-  padding: 14px 16px;
-  text-align: center;
-}
-.report-stat-value {
-  font-size: 28px; font-weight: 700;
-  font-family: var(--mono);
-  font-feature-settings: "tnum";
-  line-height: 1.1; margin-bottom: 5px;
-}
-.report-stat-value.red   { color: var(--red); }
-.report-stat-value.green { color: var(--green); }
-.report-stat-value.yellow{ color: var(--yellow); }
-.report-stat-label { font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.dash-status:hover { background: var(--hover); color: var(--text-2); }
+.dash-status-sep { opacity: 0.5; }
+#dashWipe { font-family: var(--mono); }
 
 /* ══════════════════════════════════════════════════════════════
    PRIVACY PANEL  (dropdown from shield button)
@@ -965,11 +919,10 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
 /* Webview layer */
 .webview-layer { position: absolute; inset: 0; z-index: 0; }
 
-/* Responsive */
-@media (max-width: 900px) {
-  .dash-grid { grid-template-columns: 1fr; }
-  .metric-grid { grid-template-columns: repeat(2, 1fr); }
-  .report-stats { grid-template-columns: 1fr; }
+/* Responsive — usable down to the 500px window minimum (macOS quadrant tiling) */
+@media (max-width: 640px) {
+  .dash-center { gap: 16px; }
+  .dash-status { flex-wrap: wrap; justify-content: center; }
 }
 </style>
 </head>
@@ -1062,78 +1015,24 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
 
       <!-- DASHBOARD (shown when no tab is browsing) -->
       <div class="dashboard" id="dashboard">
+        <div class="dash-center">
+          <div class="dash-profile">
+            <span class="pp-dot" id="dashProfileDot"></span>
+            <span id="dashProfileKicker">Personal</span>
+          </div>
 
-        <!-- Row 1: hero + live status -->
-        <div class="dash-grid">
-          <section class="hero-panel">
-            <div class="hero-kicker"><span id="dashProfileKicker">Personal</span></div>
-            <h1>Browse freely. Leave nothing behind.</h1>
-            <p>VPN, wipe timer, vault, tracker blocking — all in one place. No shortcuts.</p>
-            <div class="dash-search">
-              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--text-3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-              <input id="dashboardSearch" type="text" placeholder="Search or enter a URL">
-            </div>
-          </section>
+          <div class="dash-search">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="color:var(--text-3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input id="dashboardSearch" type="text" placeholder="Search privately, or enter address">
+          </div>
 
-          <aside class="status-card">
-            <h2>Live status</h2>
-            <div class="status-line"><span>VPN</span><strong id="dashVpn">Dev mode</strong></div>
-            <div class="status-line"><span>DNS</span><strong>1.1.1.1 DoH</strong></div>
-            <div class="status-line"><span>Next wipe</span><strong id="dashWipe">--:--:--</strong></div>
-          </aside>
+          <!-- Single glanceable status line; click opens the shield panel -->
+          <button class="dash-status" id="dashStatusStrip" data-widget="status-strip">
+            <span><span id="reportBlocked">0</span> trackers blocked</span>
+            <span class="dash-status-sep">·</span>
+            <span>next wipe <span id="dashWipe">--:--:--</span></span>
+          </button>
         </div>
-
-        <!-- Row 2: metric cards -->
-        <div class="metric-grid" id="metricGridSection" data-widget="metric-grid">
-          <div class="metric-card" data-widget="vpn">
-            <div class="metric-label">VPN Tunnel</div>
-            <div class="metric-value green" id="metricVpn">Ready</div>
-            <div class="metric-detail" id="metricVpnDetail">WARP proxy not configured</div>
-          </div>
-          <div class="metric-card" data-widget="wipe">
-            <div class="metric-label">Next Wipe</div>
-            <div class="metric-value violet" id="metricWipe">--:--</div>
-            <div class="metric-detail">All sessions purged</div>
-            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap;">
-              <button id="wipeNowBtn" class="pp-btn">Wipe now</button>
-              <select id="wipeIntervalSelect" class="pp-select">
-                <option value="1">1h</option><option value="6">6h</option>
-                <option value="12">12h</option><option value="24" selected>24h</option>
-                <option value="48">48h</option><option value="168">7d</option>
-              </select>
-            </div>
-          </div>
-          <div class="metric-card" data-widget="containers">
-            <div class="metric-label">Containers</div>
-            <div class="metric-value yellow">5</div>
-            <div class="metric-detail">Default · Work · Social · Finance · Research</div>
-          </div>
-          <div class="metric-card" data-widget="vault">
-            <div class="metric-label">Vault</div>
-            <div class="metric-value red" id="metricVault">Session</div>
-            <div class="metric-detail">Camera and mic policy</div>
-          </div>
-        </div>
-
-        <!-- Row 3: privacy report — full width -->
-        <section class="privacy-report" id="privacyReport" data-widget="privacy-report">
-          <h3>Privacy report</h3>
-          <div class="report-stats">
-            <div class="report-stat">
-              <div class="report-stat-value red" id="reportBlocked">0</div>
-              <div class="report-stat-label">trackers blocked</div>
-            </div>
-            <div class="report-stat">
-              <div class="report-stat-value green" id="reportSanitised">0</div>
-              <div class="report-stat-label">links sanitised</div>
-            </div>
-            <div class="report-stat">
-              <div class="report-stat-value yellow" id="reportMediaBlocked">0</div>
-              <div class="report-stat-label">camera denied</div>
-            </div>
-          </div>
-        </section>
-
       </div><!-- /dashboard -->
 
       <!-- Native WebContentsView placeholder -->
@@ -1782,12 +1681,8 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
 
 <!-- Widget customise popover -->
 <div class="popover" id="widgetPopover">
-  <div class="popover-header">Dashboard Widgets</div>
-  <label><input type="checkbox" id="wVpn" checked> VPN Tunnel</label>
-  <label><input type="checkbox" id="wWipe" checked> Next Wipe</label>
-  <label><input type="checkbox" id="wContainers" checked> Containers</label>
-  <label><input type="checkbox" id="wVault" checked> Vault</label>
-  <label><input type="checkbox" id="wPrivacyReport" checked> Privacy Report</label>
+  <div class="popover-header">Start Page</div>
+  <label><input type="checkbox" id="wStatusStrip" checked> Status strip</label>
 </div>
 
 <script>
@@ -1874,7 +1769,6 @@ function setVaultMode(mode, label, durationMs) {
   $$('.vault-state-option').forEach((o) => o.classList.toggle('active', o.dataset.mode === mode));
   const labels = { locked: 'Locked', session: 'Session', timed: 'Timed' };
   const lbl = labels[mode] || label || mode;
-  const mv = $('#metricVault'); if (mv) mv.textContent = lbl;
   const sv = $('#statusVault'); if (sv) sv.textContent = lbl;
   const svb = $('#statusVaultBar'); if (svb) svb.textContent = lbl;
   applyVaultIndicator(mode, durationMs ? Date.now() + durationMs : null);
@@ -1886,7 +1780,6 @@ if (hasBridge && window.phantom?.vault?.onChange) {
     const labels = { locked: 'Locked', session: 'Session', timed: 'Timed' };
     $$('.vault-state-option').forEach((o) => o.classList.toggle('active', o.dataset.mode === mode));
     const lbl = labels[mode] || mode;
-    const mv = $('#metricVault'); if (mv) mv.textContent = lbl;
     const sv = $('#statusVault'); if (sv) sv.textContent = lbl;
     const svb = $('#statusVaultBar'); if (svb) svb.textContent = lbl;
     applyVaultIndicator(mode, expiresAt);
@@ -1952,6 +1845,7 @@ function updateActiveProfileChip(profile) {
   const apN = $('#activeProfileName'); if (apN) apN.textContent = n;
   const apC = $('#activeProfileColor'); if (apC) apC.style.background = c;
   const dk = $('#dashProfileKicker'); if (dk) dk.textContent = n;
+  const dd = $('#dashProfileDot'); if (dd) dd.style.background = c;
   $$('.profile-option').forEach((el) => el.classList.toggle('selected', el.dataset.profileUuid === profile.uuid));
 }
 
@@ -2135,7 +2029,6 @@ function applyWipeCountdown(data) {
   const short = fmt.length >= 5 ? fmt.slice(0, 5) : fmt;
   const sw = $('#statusWipe'); if (sw) sw.textContent = fmt;
   const dw = $('#dashWipe'); if (dw) dw.textContent = fmt;
-  const mw = $('#metricWipe'); if (mw) mw.textContent = short;
   const pw = $('#panelWipeTime'); if (pw) pw.textContent = short;
   const rp = $('#reportResetPanel'); if (rp) rp.textContent = fmt.slice(0, 5);
 }
@@ -2145,8 +2038,6 @@ function updatePrivacyReport(report) {
   const { blocked = 0, sanitised = 0, mediaBlocked = 0 } = report;
   const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
   set('#reportBlocked',      blocked.toLocaleString());
-  set('#reportSanitised',    sanitised.toLocaleString());
-  set('#reportMediaBlocked', mediaBlocked.toLocaleString());
   set('#panelReportBlocked',   blocked.toLocaleString());
   set('#panelReportSanitised', sanitised.toLocaleString());
   set('#panelReportMedia',     mediaBlocked.toLocaleString());
@@ -2176,27 +2067,17 @@ async function initWipe() {
   window._privacyPollInterval = setInterval(pollPrivacyReport, 15000);
 }
 
-$('#wipeNowBtn')?.addEventListener('click', async () => {
-  if (!hasBridge) { showToast('Run npm start to use wipe.'); return; }
-  try { await window.phantom.wipe.triggerNow(); showToast('Wipe triggered.'); } catch (err) { showToast(err.message); }
-});
 $('#wipeNowPanelBtn')?.addEventListener('click', async () => {
   if (!hasBridge) { showToast('Run npm start to use wipe.'); return; }
   try { await window.phantom.wipe.triggerNow(); showToast('Wipe triggered.'); closeAllPopovers(); } catch (err) { showToast(err.message); }
 });
 
 function syncWipeInterval(hours) {
-  $$('#wipeIntervalSelect, #wipeIntervalPanelSelect').forEach((s) => {
-    const opt = s.querySelector(`option[value="${hours}"]`);
-    if (opt) opt.selected = true;
-  });
+  const s = $('#wipeIntervalPanelSelect');
+  const opt = s?.querySelector(`option[value="${hours}"]`);
+  if (opt) opt.selected = true;
 }
 
-$('#wipeIntervalSelect')?.addEventListener('change', async (e) => {
-  if (!hasBridge) return;
-  const hours = parseInt(e.target.value, 10);
-  try { const r = await window.phantom.wipe.setInterval(hours); if (r?.ok) { showToast(`Wipe interval set to ${r.hours}h`); syncWipeInterval(r.hours); } } catch {}
-});
 $('#wipeIntervalPanelSelect')?.addEventListener('change', async (e) => {
   if (!hasBridge) return;
   const hours = parseInt(e.target.value, 10);
@@ -2553,6 +2434,12 @@ $('#dashboardSearch').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { navigateActive(e.currentTarget.value); e.currentTarget.value = ''; }
 });
 
+// Status strip → open the shield panel (full wipe/vault/report controls)
+$('#dashStatusStrip')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  openPopover($('#privacyPanel'));
+});
+
 $('#btnBack').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.goBack(t.id); });
 $('#btnForward').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.goForward(t.id); });
 $('#btnReload').addEventListener('click', () => { const t = activeTab(); if (t?.url && hasBridge) phantom.tabViews.reload(t.id); });
@@ -2611,9 +2498,6 @@ function applyWarpStatus(status) {
     pill.dataset.tip = detailLabel;
   }
   const ld = $('#warpLatency');  if (ld) ld.textContent = shortLabel;
-  const dv = $('#dashVpn');      if (dv) dv.textContent = connected ? 'Active' : blocked ? 'Blocked' : 'Off';
-  const mv = $('#metricVpn');    if (mv) { mv.textContent = connected ? 'Connected' : blocked ? 'Blocked' : 'Off'; mv.className = `metric-value ${connected ? 'green' : blocked ? 'red' : ''}`; }
-  const md = $('#metricVpnDetail'); if (md) md.textContent = detailLabel;
   const sw = $('#statusWarp');   if (sw) sw.textContent = `VPN: ${shortLabel}`;
   const sd = $('#statusWarpDot'); if (sd) sd.style.background = color;
   const wd = $('#warpDot');       if (wd) wd.style.background = color;
@@ -2934,9 +2818,7 @@ document.addEventListener('keydown', (e) => {
 
 // ── Dashboard widget customise ────────────────────────────────────────────────
 const WIDGET_MAP = {
-  wVpn: '[data-widget="vpn"]', wWipe: '[data-widget="wipe"]',
-  wContainers: '[data-widget="containers"]', wVault: '[data-widget="vault"]',
-  wPrivacyReport: '[data-widget="privacy-report"]'
+  wStatusStrip: '[data-widget="status-strip"]'
 };
 let _widgetPrefs = {};
 

@@ -117,7 +117,9 @@ contextBridge.exposeInMainWorld('phantom', {
     setLinkSanitiser: (v) => ipcRenderer.send('settings:link-sanitiser', v),
     setRedirectBlock: (v) => ipcRenderer.send('settings:redirect-block', v),
     setHttpsOnly:     (v) => ipcRenderer.send('settings:https-only',     v),
-    setTrackerBlock:  (v) => ipcRenderer.send('settings:tracker-block',  v)
+    setTrackerBlock:  (v) => ipcRenderer.send('settings:tracker-block',  v),
+    setAutoLock:      (v) => ipcRenderer.send('settings:auto-lock',      v),
+    setReportReset:   (v) => ipcRenderer.send('settings:report-reset',   v)
   },
 
   // ── tab snapshots ────────────────────────────────────────────────────────────

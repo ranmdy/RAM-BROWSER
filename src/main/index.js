@@ -25,6 +25,10 @@ const CONTAINERS = ['default', 'work', 'social', 'finance', 'research'];
 const PARTITIONS = new Map(CONTAINERS.map((c) => [c, `ram-${c}`]));
 
 // ── env config ────────────────────────────────────────────────────────────────
+// Test hook: point userData at a scratch dir so e2e runs never touch the
+// real profiles/prefs on this machine.
+if (process.env.RAM_USER_DATA) app.setPath('userData', process.env.RAM_USER_DATA);
+
 let proxyUrl = process.env.RAM_PROXY_URL || process.env.PHANTOM_PROXY_URL || '';
 let requireWarp = process.env.RAM_REQUIRE_VPN === '1';
 
@@ -79,7 +83,7 @@ function closeProfileWindows() {
     if (ws.profile) { try { ws.win.close(); } catch {} }
   }
 }
-let vaultMode = 'session';
+let vaultMode = 'locked'; // matches Settings "Default Vault State" default; renderer pushes saved value at boot
 let vaultTimedExpiry = null;   // epoch ms for timed mode expiry
 let vaultTimedTimer = null;    // NodeJS.Timeout for timed auto-revoke
 let activeProfileUuid = null;
@@ -95,6 +99,9 @@ let wipeOnQuit = false;          // set by settings:wipe-on-quit IPC
 let linkSanitiserEnabled = true; // set by settings:link-sanitiser IPC
 let redirectBlockEnabled = true; // set by settings:redirect-block IPC
 let httpsOnlyEnabled = true;     // set by settings:https-only IPC
+let autoLockOnSleep = true;      // set by settings:auto-lock IPC — PIN overlay on system sleep/lock
+let reportResetOnWipe = true;    // set by settings:report-reset IPC — reset privacy counters on wipe
+let contentProtectionEnabled = true; // set by security:set-content-protection IPC — applies to ALL windows
 let profileSwitchInProgress = false; // guard against concurrent profile switches
 let warpStatusIntervalId = null; // reference for the periodic WARP status push
 
@@ -768,23 +775,24 @@ async function createBrowserWindow(profile = null) {
   // the same content-protection guarantee directly.
   if (isPrimary) {
     screenshotSecurity.attach(win, {
-      contentProtection: true,
+      contentProtection: contentProtectionEnabled,
       lockOnSleep: true,
-      onLock: () => {
+      onLock: (reason) => {
         // Suspend vault permissions on lock regardless of profile type
         setVaultMode('locked');
+        // Honor the "Auto-Lock on Sleep" setting for the PIN overlay
+        if (!autoLockOnSleep) return;
         // Only PIN-protected profiles get the PIN lock screen: a PIN-less
         // profile has no credential to unlock with — locking it soft-locks
         // the app and 5 failed PIN attempts trigger a panic wipe.
         if (!activeProfileHasPin) return;
         isScreenLocked = true;
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('security:lock', { reason: 'sleep' });
-        }
+        // Every window on the global profile locks, not just the primary
+        sendGlobalProfileWindows('security:lock', { reason: reason || 'sleep' });
       }
     });
   } else {
-    try { win.setContentProtection(true); } catch {}
+    try { win.setContentProtection(contentProtectionEnabled); } catch {}
   }
 
   win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -1302,10 +1310,9 @@ app.whenReady().then(async () => {
   // item's accelerator shows the same keys; when the app is focused this
   // global shortcut intercepts them — both converge on performPanic().
   globalShortcut.register('CommandOrControl+Shift+X', async () => {
+    // performPanic broadcasts 'privacy:panic-triggered' to all windows —
+    // no per-window send needed here.
     try { await performPanic(); } catch {}
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('privacy:panic-triggered');
-    }
   });
 
   // 5. Start wipe countdown ticker — attach listeners BEFORE startTick() to avoid missing first event
@@ -1324,7 +1331,7 @@ app.whenReady().then(async () => {
     // Spec 6.2: the tab snapshot survives the wipe cycle so tabs restore
     // afterwards. Only panic / clear-all-data / ghost mode destroy it.
     notificationQueue.length = 0;
-    resetPrivacyReport();
+    if (reportResetOnWipe) resetPrivacyReport();
 
     // Revoke push subscriptions — clear service workers in all sessions
     await Promise.allSettled(managedSessions().map((s) =>
@@ -1361,9 +1368,9 @@ app.whenReady().then(async () => {
     // network is still blocked by requireWarp in onBeforeRequest.
     // Lock UI only exists in the primary window (profile windows host
     // PIN-less profiles by construction).
-    if (active && !isScreenLocked && activeProfileHasPin && mainWindow && !mainWindow.isDestroyed()) {
+    if (active && !isScreenLocked && activeProfileHasPin) {
       isScreenLocked = true;
-      mainWindow.webContents.send('security:lock', { reason: 'kill-switch' });
+      sendGlobalProfileWindows('security:lock', { reason: 'kill-switch' });
     }
   });
 
@@ -1542,25 +1549,35 @@ ipcMain.handle('privacy:clear-all-data', async () => {
 
 // Shared panic implementation — the ONLY wipe-everything path
 // (global shortcut, menu, and privacy:panic IPC all converge here).
-async function performPanic() {
-  clipboard.clear();
-  setVaultMode('locked');   // force vault to locked on panic
-  isScreenLocked = false;   // panic resets lock state (UI wiped)
-  notificationQueue.length = 0; // drop queued notifications
-  await clearManagedStorage();
-  // Revoke push subscriptions — clear service workers in all sessions
-  await Promise.allSettled(managedSessions().map((s) => s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })));
-  tabSnapshotManager?.clear().catch(() => {});
-  // Destroy all active WebContentsViews in every window
-  for (const ws of windows.values()) {
-    for (const view of ws.tabViews.values()) {
-      try { view.webContents.stop(); } catch {}
-      try { if (!ws.win.isDestroyed()) ws.win.contentView?.removeChildView(view); } catch {}
+// In-flight guard: concurrent triggers (e.g. shortcut + IPC from the
+// renderer's broadcast handler) coalesce into a single wipe.
+let panicPromise = null;
+function performPanic() {
+  if (panicPromise) return panicPromise;
+  panicPromise = (async () => {
+    clipboard.clear();
+    setVaultMode('locked');   // force vault to locked on panic
+    isScreenLocked = false;   // panic resets lock state (UI wiped)
+    notificationQueue.length = 0; // drop queued notifications
+    await clearManagedStorage();
+    // Revoke push subscriptions — clear service workers in all sessions
+    await Promise.allSettled(managedSessions().map((s) => s.clearStorageData({ storages: ['serviceworkers', 'cachestorage'] })));
+    tabSnapshotManager?.clear().catch(() => {});
+    // Destroy all active WebContentsViews in every window
+    for (const ws of windows.values()) {
+      for (const view of ws.tabViews.values()) {
+        try { view.webContents.stop(); } catch {}
+        try { if (!ws.win.isDestroyed()) ws.win.contentView?.removeChildView(view); } catch {}
+      }
+      ws.tabViews.clear();
     }
-    ws.tabViews.clear();
-  }
-  // Close isolated profile windows — panic leaves nothing on screen
-  closeProfileWindows();
+    // Close isolated profile windows — panic leaves nothing on screen
+    closeProfileWindows();
+    // Fan out UI reset to every remaining (global-profile) window so panic
+    // from any window clears stale tab UI in all of them.
+    sendGlobalProfileWindows('privacy:panic-triggered');
+  })().finally(() => { panicPromise = null; });
+  return panicPromise;
 }
 
 ipcMain.handle('privacy:panic', async () => {
@@ -1578,6 +1595,9 @@ ipcMain.handle('wipe:trigger-now', async () => {
   if (!activeProfileUuid) return { ok: false };
   const partitions = CONTAINERS.map((c) => `ram-${c}`);
   await wipeEngine.wipeNow(activeProfileUuid, partitions);
+  // wipeNow cancels the pending timer without rescheduling — restart the
+  // auto-wipe cycle so a manual wipe never disables the 24h guarantee
+  wipeEngine.schedule(activeProfileUuid, partitions, wipeIntervalMs);
   // Snapshot intentionally preserved — same wipe cycle as the scheduled
   // wipe (spec 6.2: tabs restore after wipe)
   return { ok: true };
@@ -1834,6 +1854,8 @@ ipcMain.on('settings:link-sanitiser',  (_e, enabled) => { linkSanitiserEnabled =
 ipcMain.on('settings:redirect-block',  (_e, enabled) => { redirectBlockEnabled = Boolean(enabled); });
 ipcMain.on('settings:https-only',      (_e, enabled) => { httpsOnlyEnabled = Boolean(enabled); });
 ipcMain.on('settings:tracker-block',   (_e, enabled) => { trackerBlockEnabled = Boolean(enabled); });
+ipcMain.on('settings:auto-lock',       (_e, enabled) => { autoLockOnSleep = Boolean(enabled); });
+ipcMain.on('settings:report-reset',    (_e, enabled) => { reportResetOnWipe = Boolean(enabled); });
 
 // Screen unlock — called by renderer after successful PIN entry on lock screen
 ipcMain.on('security:screen-unlocked', () => {
@@ -1857,10 +1879,20 @@ ipcMain.handle('tabs:restore', async (e) => {
 });
 
 
-// Screenshot protection toggle
+// Screenshot protection toggle — applies to every open window, and the flag
+// is used for windows created later
 ipcMain.handle('security:set-content-protection', (_e, enabled) => {
-  screenshotSecurity.applyContentProtection(enabled);
-  return { ok: true, enabled };
+  contentProtectionEnabled = Boolean(enabled);
+  // Primary window via the screenshot module (keeps its internal state in
+  // sync — captureWindowFrame relies on it to restore protection)
+  screenshotSecurity.applyContentProtection(contentProtectionEnabled);
+  // All other windows directly
+  for (const ws of windows.values()) {
+    if (ws.win !== mainWindow && !ws.win.isDestroyed()) {
+      try { ws.win.setContentProtection(contentProtectionEnabled); } catch {}
+    }
+  }
+  return { ok: true, enabled: contentProtectionEnabled };
 });
 
 // Safe screenshot capture

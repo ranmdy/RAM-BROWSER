@@ -84,8 +84,12 @@ function applyContentProtection(enabled) {
  * @param {'sleep'|'lock-screen'|'manual'} reason
  */
 function triggerLock(reason) {
+  // When a lock callback is attached it owns the lock policy (PIN-less
+  // profile guard, auto-lock setting, multi-window broadcast). Sending
+  // 'security:lock' directly here as well would bypass those guards.
   if (_lockCallback) {
     _lockCallback(reason);
+    return;
   }
 
   if (_window && !_window.isDestroyed()) {

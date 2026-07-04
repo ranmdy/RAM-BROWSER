@@ -120,6 +120,45 @@
   --h-urlcap:    26px;
 }
 
+/* ── Light theme (Settings → General → Theme) ─────────────────── */
+body.theme-light {
+  --glass:        rgba(242, 242, 247, 0.85);
+  --glass-hi:     rgba(0, 0, 0, 0.04);
+  --glass-border: rgba(0, 0, 0, 0.10);
+  --bg:           #f2f2f7;
+  --surface:      rgba(255, 255, 255, 0.92);
+  --surface-2:    rgba(229, 229, 234, 0.85);
+  --hover:        rgba(0, 0, 0, 0.05);
+  --text:         #1c1c1e;
+  --text-2:       rgba(28, 28, 30, 0.68);
+  --text-3:       rgba(28, 28, 30, 0.42);
+
+  --accent:       #6e6e74;
+  --accent-deep:  #b8b8be;
+  --accent-s:     rgba(110, 110, 116, 0.16);
+
+  --green:        #248a3d;
+  --yellow:       #b58a00;
+  --red:          #d70015;
+  --blue:         #0071e3;
+
+  --shadow:    0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
+  --shadow-sm: 0 8px 24px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05);
+
+  --glass-1:  rgba(242, 242, 247, 0.60);
+  --glass-2:  rgba(242, 242, 247, 0.78);
+  --glass-3:  rgba(242, 242, 247, 0.90);
+
+  --sheen-top:    linear-gradient(180deg, rgba(255,255,255,0.75) 0%, rgba(255,255,255,0.20) 28%, rgba(255,255,255,0) 60%);
+  --sheen-strong: linear-gradient(180deg, rgba(255,255,255,0.90) 0%, rgba(255,255,255,0.25) 35%, rgba(255,255,255,0) 70%);
+
+  --rim-light: inset 0 1px 0 rgba(255,255,255,0.85);
+  --rim-dark:  inset 0 -1px 0 rgba(0,0,0,0.08);
+  --rim-edge:  inset 0 0 0 1px rgba(0,0,0,0.05);
+
+  --refract:   linear-gradient(135deg, rgba(0,0,0,0.02), rgba(255,255,255,0) 60%);
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     --glass:        rgba(255, 255, 255, 0.78);
@@ -495,6 +534,8 @@ body.fullscreen .toolbar { padding-left: 8px; }
   gap: 22px;
   margin-top: -6vh; /* optical center, slightly above true center */
 }
+/* New Tab Page: "Blank" — dashboard chrome without content */
+body.blank-start .dash-center { display: none; }
 .dash-profile {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 600; color: var(--text-2);
@@ -1542,8 +1583,8 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
         <div class="s-version">Ram Browser · v0.1.0 · Electron 41 · Chromium</div>
 
         <div class="s-stat-grid">
-          <div class="s-stat"><div class="s-stat-num">131</div><div class="s-stat-lbl">Unit Tests</div></div>
-          <div class="s-stat"><div class="s-stat-num">8</div><div class="s-stat-lbl">E2E Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">100</div><div class="s-stat-lbl">Unit Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">18</div><div class="s-stat-lbl">E2E Tests</div></div>
           <div class="s-stat"><div class="s-stat-num">116</div><div class="s-stat-lbl">Features</div></div>
         </div>
 
@@ -2454,14 +2495,26 @@ $('#screenshotPanelBtn').addEventListener('click', () => { closeAllPopovers(); t
 $('#warpPill')?.addEventListener('click', (e) => { e.stopPropagation(); showToast('VPN status unavailable'); });
 
 // ── Panic ─────────────────────────────────────────────────────────────────────
-function triggerPanic() {
-  window.phantom?.privacy?.panic?.().catch(() => {});
+// resetPanicUI: local UI reset only. Runs in EVERY window when main broadcasts
+// 'privacy:panic-triggered' after the wipe, so panic from any window clears all.
+function resetPanicUI() {
   resetToDashboard();
   toggleMessaging(false);
   closeAllPopovers();
   hideFocusBlur();
   const pb = $('#btnPanic'); if (pb) { pb.style.background = ''; pb.style.color = ''; }
   panicClicks = 0;
+}
+
+// triggerPanic: fire the main-process wipe. UI reset arrives via the
+// broadcast (privacy.onPanic → resetPanicUI) — calling it here too would
+// be harmless but redundant; without a bridge (plain-browser dev) reset locally.
+function triggerPanic() {
+  if (window.phantom?.privacy?.panic) {
+    window.phantom.privacy.panic().catch(() => {});
+  } else {
+    resetPanicUI();
+  }
 }
 
 $('#btnPanic').addEventListener('click', () => {
@@ -2513,7 +2566,7 @@ function applyWarpStatus(status) {
 window.phantom?.warp?.getStatus?.().then(applyWarpStatus).catch(() => {});
 window.phantom?.warp?.onStatus?.(applyWarpStatus);
 
-window.phantom?.privacy?.onPanic?.(() => triggerPanic());
+window.phantom?.privacy?.onPanic?.(() => resetPanicUI());
 window.phantom?.browser?.onNewTabRequest?.((url) => { const t = createTab({ title: titleFromUrl(url), active: true }); navigateTab(t, url); });
 
 // ── Menu bar IPC (from main process custom menu) ───────────────────────────
@@ -2857,6 +2910,17 @@ function saveSettings(patch) {
   return s;
 }
 
+// ── Theme ─────────────────────────────────────────────────────────────────────
+const _systemLightMq = window.matchMedia('(prefers-color-scheme: light)');
+function applyTheme(theme) {
+  const light = theme === 'light' || ((theme || 'system') === 'system' && _systemLightMq.matches);
+  document.body.classList.toggle('theme-light', light);
+}
+// Follow OS appearance changes while in System mode
+_systemLightMq.addEventListener('change', () => {
+  if ((loadSettings().theme || 'system') === 'system') applyTheme('system');
+});
+
 function openSettings() {
   // Hide all native WebContentsViews — they sit above HTML and ignore z-index
   if (hasBridge) {
@@ -2921,6 +2985,10 @@ function applySettingsToUI() {
 }
 
 function applyLiveSettings(s) {
+  // Theme
+  applyTheme(s.theme || 'system');
+  // Blank start page hides dashboard content
+  document.body.classList.toggle('blank-start', s.startPage === 'blank');
   // Panic button visibility
   const pb = $('#btnPanic'); if (pb) pb.style.display = s.panicVisible === false ? 'none' : '';
   // WARP latency display
@@ -2935,6 +3003,8 @@ function applyLiveSettings(s) {
     window.phantom?.settings?.setHttpsOnly?.(s.httpsOnly !== false);
     window.phantom?.settings?.setLinkSanitiser?.(s.linkSanitiser !== false);
     window.phantom?.settings?.setRedirectBlock?.(s.redirectBlock !== false);
+    window.phantom?.settings?.setAutoLock?.(s.autoLock !== false);
+    window.phantom?.settings?.setReportReset?.(s.reportReset !== false);
   }
 }
 
@@ -2958,18 +3028,22 @@ function initSettings() {
 
   // ── General ──
   $('#sPanicVisible')?.addEventListener('change', (e) => { saveSettings({ panicVisible: e.target.checked }); applyLiveSettings(loadSettings()); });
-  $('#sTheme')?.addEventListener('change', (e) => { saveSettings({ theme: e.target.value }); });
+  $('#sTheme')?.addEventListener('change', (e) => { saveSettings({ theme: e.target.value }); applyTheme(e.target.value); });
   $('#sSearchEngine')?.addEventListener('change', (e) => { saveSettings({ searchEngine: e.target.value }); });
   $('#sStartPage')?.addEventListener('change', (e) => {
     saveSettings({ startPage: e.target.value });
     const r = $('#sCustomUrlRow'); if (r) r.style.display = e.target.value === 'custom' ? '' : 'none';
+    document.body.classList.toggle('blank-start', e.target.value === 'blank');
   });
   $('#sCustomUrl')?.addEventListener('change', (e) => saveSettings({ customUrl: e.target.value }));
   $('#sRestoreTabs')?.addEventListener('change', (e) => saveSettings({ restoreTabs: e.target.checked }));
 
   // ── Security ──
   $('#sPinAttempts')?.addEventListener('change', (e) => saveSettings({ pinAttempts: Number(e.target.value) }));
-  $('#sAutoLock')?.addEventListener('change', (e) => saveSettings({ autoLock: e.target.checked }));
+  $('#sAutoLock')?.addEventListener('change', (e) => {
+    saveSettings({ autoLock: e.target.checked });
+    window.phantom?.settings?.setAutoLock?.(e.target.checked);
+  });
   $('#sBlurDelay')?.addEventListener('change', (e) => saveSettings({ blurDelay: e.target.value }));
   $('#sBlackoutTimeout')?.addEventListener('change', (e) => saveSettings({ blackoutTimeout: e.target.value }));
   $('#sScreenProtect')?.addEventListener('change', (e) => {
@@ -3027,7 +3101,10 @@ function initSettings() {
     saveSettings({ wipeOnQuit: e.target.checked });
     window.phantom?.settings?.setWipeOnQuit?.(e.target.checked);
   });
-  $('#sReportReset')?.addEventListener('change', (e) => saveSettings({ reportReset: e.target.checked }));
+  $('#sReportReset')?.addEventListener('change', (e) => {
+    saveSettings({ reportReset: e.target.checked });
+    window.phantom?.settings?.setReportReset?.(e.target.checked);
+  });
   $('#sTrackerBlock')?.addEventListener('change', (e) => {
     saveSettings({ trackerBlock: e.target.checked });
     window.phantom?.settings?.setTrackerBlock?.(e.target.checked);
@@ -3143,6 +3220,28 @@ function initSettings() {
 
   // Apply saved settings on load
   applyLiveSettings(loadSettings());
+
+  // Boot-only reconciliation. NOT in applyLiveSettings — that also runs every
+  // time the settings view opens, and re-pushing these would clobber live
+  // state (e.g. re-lock a vault the user unlocked for the session).
+  if (hasBridge) {
+    const s0 = loadSettings();
+    // Default Vault State — "Applied when Ram Browser launches"
+    const vMode = s0.vaultDefault || 'locked';
+    const vDuration = vMode === 'timed' ? (Number(s0.vaultDuration) || 300) * 1000 : undefined;
+    window.phantom?.vault?.setMode?.(vMode, vDuration)?.catch?.(() => {});
+    // Tor honesty: never show the toggle ON while traffic is not routed
+    if (s0.torEnabled) {
+      (async () => {
+        const r = await window.phantom?.warp?.enableTor?.().catch(() => ({ ok: false }));
+        if (!r?.ok) {
+          saveSettings({ torEnabled: false });
+          const el = $('#sTorEnabled'); if (el) el.checked = false;
+          showToast('Tor was enabled last session but is not reachable — Tor routing is OFF.', 6000);
+        }
+      })();
+    }
+  }
 }
 
 (async () => {

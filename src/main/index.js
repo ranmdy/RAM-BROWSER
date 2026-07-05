@@ -104,6 +104,7 @@ let reportResetOnWipe = true;    // set by settings:report-reset IPC — reset p
 let contentProtectionEnabled = true; // set by security:set-content-protection IPC — applies to ALL windows
 let profileSwitchInProgress = false; // guard against concurrent profile switches
 let warpStatusIntervalId = null; // reference for the periodic WARP status push
+let dnsProbeResult = null; // cached one-shot DNS leak probe result, replayed to new windows
 
 // Notification queue — stores {title, body} entries while screen is locked
 const notificationQueue = [];
@@ -604,16 +605,23 @@ function flushNotificationQueue() {
   if (isScreenLocked || activeProfileIsDecoy) return;
   if (!Notification.isSupported()) { notificationQueue.length = 0; return; }
   while (notificationQueue.length) {
-    const { title, body } = notificationQueue.shift();
+    const { title, body, profileUuid } = notificationQueue.shift();
+    // Drop items queued for a different profile — profile A's notifications
+    // must never display after switching to profile B.
+    if (profileUuid !== activeProfileUuid) continue;
     try { new Notification({ title, body }).show(); } catch {}
   }
 }
+
+const NOTIFICATION_QUEUE_MAX = 50;
 
 function sendNotification(title, body) {
   // Ghost (decoy) mode: hard-drop — never queue, never display (spec 6.14).
   if (activeProfileIsDecoy) return;
   if (isScreenLocked) {
-    notificationQueue.push({ title, body });
+    notificationQueue.push({ title, body, profileUuid: activeProfileUuid });
+    // Bounded queue: drop oldest when full so a chatty page can't grow memory
+    if (notificationQueue.length > NOTIFICATION_QUEUE_MAX) notificationQueue.shift();
     return;
   }
   if (Notification.isSupported()) {
@@ -724,6 +732,9 @@ async function createBrowserWindow(profile = null) {
     titleBarStyle: 'hidden',
     trafficLightPosition: { x: 14, y: 13 },
     backgroundColor: '#0f0f11',
+    // Window icon for Linux/Windows dev runs (macOS ignores this; packaged
+    // builds use the platform icon from electron-builder)
+    icon: path.join(__dirname, '../../build/icons/icon.png'),
     title: profile ? `Ram Browser — ${profile.name}` : 'Ram Browser',
     // Start hidden when VPN is required (primary only); show once WARP
     // reports Connected. Secondary windows open from an already-running app.
@@ -793,6 +804,14 @@ async function createBrowserWindow(profile = null) {
     });
   } else {
     try { win.setContentProtection(contentProtectionEnabled); } catch {}
+    // screenshotSecurity.attach() only wires focus/blur for the primary
+    // window — secondary windows need the same events for the blur overlay.
+    win.on('focus', () => {
+      if (!win.isDestroyed()) win.webContents.send('window:focus', true);
+    });
+    win.on('blur', () => {
+      if (!win.isDestroyed()) win.webContents.send('window:focus', false);
+    });
   }
 
   win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -839,6 +858,10 @@ async function createBrowserWindow(profile = null) {
   // how the renderer learns which (fixed) profile it hosts.
   win.webContents.on('did-finish-load', () => {
     if (win.isDestroyed()) return;
+    // Replay the one-shot DNS probe result for windows created after the probe
+    if (dnsProbeResult && !winState.profile) {
+      win.webContents.send('dns:probe-result', dnsProbeResult);
+    }
     if (winState.profile) {
       win.webContents.send('profile:active', { ...winState.profile });
     } else if (activeProfileUuid) {
@@ -1266,12 +1289,26 @@ app.whenReady().then(async () => {
   // 0a. Set custom minimal menu bar (rebuilt with profiles after init below)
   buildAppMenu();
 
+  // Ram logo in the macOS Dock during dev runs (packaged builds get it from
+  // build/icon.icns via electron-builder; build/ is not shipped in the asar)
+  if (process.platform === 'darwin' && !app.isPackaged && app.dock) {
+    try { app.dock.setIcon(path.join(__dirname, '../../build/icons/icon.png')); } catch {}
+  }
+
   // 0. Register phantom:// protocol handler
   //    phantom://dashboard → built-in privacy dashboard (same as new tab page)
   protocol.handle('phantom', (request) => {
     const url = new URL(request.url);
     // phantom://dashboard → serve the UI HTML
     if (url.hostname === 'dashboard' || url.hostname === 'newtab') {
+      // Relative asset requests from the UI HTML (e.g. src/assets/ram-logo.svg)
+      // arrive as phantom://dashboard/src/assets/... — serve the whitelisted
+      // asset files, everything else falls through to the HTML itself.
+      if (url.pathname.startsWith('/src/assets/') && url.pathname.endsWith('.svg')) {
+        const assetName = path.basename(url.pathname);
+        const assetPath = path.join(__dirname, '../assets', assetName);
+        return net.fetch(`file://${assetPath}`);
+      }
       const uiPath = path.join(__dirname, '../../phantom-browser-ui.html');
       return net.fetch(`file://${uiPath}`);
     }
@@ -1345,14 +1382,13 @@ app.whenReady().then(async () => {
   //     If RAM_REQUIRE_VPN=1 we only proceed if WARP is connected.
   //     The probe result is sent to the renderer for display.
   probeNetwork('https://1.1.1.1/cdn-cgi/trace').then((result) => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('dns:probe-result', {
-        ok: result.ok,
-        // If probe succeeds with requireWarp=true and no proxy, that means
-        // traffic escaped the VPN — report as a potential leak.
-        possibleLeak: result.ok && requireWarp && !proxyUrl
-      });
-    }
+    dnsProbeResult = {
+      ok: result.ok,
+      // If probe succeeds with requireWarp=true and no proxy, that means
+      // traffic escaped the VPN — report as a potential leak.
+      possibleLeak: result.ok && requireWarp && !proxyUrl
+    };
+    sendGlobalProfileWindows('dns:probe-result', dnsProbeResult);
   }).catch(() => {});
 
   // 7. WARP supervisor (graceful if warp-cli not installed)
@@ -1402,7 +1438,9 @@ app.on('before-quit', async (e) => {
     const partitions = CONTAINERS.map((c) => `ram-${c}`);
     await wipeEngine.wipeNow(activeProfileUuid, partitions);
     await clearManagedStorage();
-    tabSnapshotManager?.clear().catch(() => {});
+    // Awaited: app.exit() below kills the process, so an un-awaited clear
+    // could leave the snapshot file on disk after a wipe-on-quit.
+    if (tabSnapshotManager) await tabSnapshotManager.clear();
   } catch {}
   app.exit(0);
 });
@@ -1698,10 +1736,8 @@ ipcMain.handle('profiles:switch', async (_e, { uuid, pin }) => {
       notificationQueue.length = 0;
     } catch {}
     await activateProfile(result.profile, result.key);
-    // Notify renderer to activate ghost mode UI
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('profile:ghost-mode', { active: true });
-    }
+    // Notify every global-profile window to activate ghost mode UI
+    sendGlobalProfileWindows('profile:ghost-mode', { active: true });
   }
   return {
     result: result.result,
@@ -1829,6 +1865,13 @@ ipcMain.handle('pin:set', async (_e, { uuid, pin }) => {
   }
   await profileManager.updateProfile(uuid, { hasPin: true, keySafe: null, keyBase64: null });
 
+  // Re-encrypt the existing tab snapshot under the PIN-derived key so
+  // post-wipe tab restore keeps working. rekey() clears the snapshot if the
+  // old blob can't be decrypted, so a stale undecryptable file never lingers.
+  if (oldKey) {
+    try { await createSnapshotManager(dir, oldKey).rekey(oldKey, newKey); } catch {}
+  }
+
   // Keep the live session working with the new key
   if (uuid === activeProfileUuid) {
     activeProfileKey = newKey;
@@ -1900,9 +1943,10 @@ ipcMain.handle('security:set-content-protection', (_e, enabled) => {
   return { ok: true, enabled: contentProtectionEnabled };
 });
 
-// Safe screenshot capture
-ipcMain.handle('screenshot:capture', async () => {
-  const dataUrl = await screenshotSecurity.captureWindowFrame();
+// Safe screenshot capture — captures the window that requested it
+ipcMain.handle('screenshot:capture', async (e) => {
+  const requestingWin = BrowserWindow.fromWebContents(e.sender);
+  const dataUrl = await screenshotSecurity.captureWindowFrame(requestingWin);
   return { dataUrl };
 });
 

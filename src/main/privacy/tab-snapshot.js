@@ -37,7 +37,7 @@ class TabSnapshotManager {
 
   /**
    * Save a snapshot immediately (no debounce).
-   * @param {Array<{url:string, title:string, pinned:boolean, containerId:string}>} tabs
+   * @param {Array<{url:string, title:string, pinned:boolean, container:string}>} tabs
    * @param {number} [activeIndex]
    */
   async writeDirect(tabs, activeIndex = 0) {
@@ -49,7 +49,8 @@ class TabSnapshotManager {
         url: t.url || '',
         title: t.title || '',
         pinned: Boolean(t.pinned),
-        containerId: t.containerId || 'default'
+        // Accept legacy `containerId` from old snapshots being re-written
+        container: t.container || t.containerId || 'default'
       }))
     };
 
@@ -81,7 +82,14 @@ class TabSnapshotManager {
   async read() {
     try {
       const blob = await fs.readFile(this._snapshotPath);
-      return decryptJson(blob, this._key);
+      const snapshot = decryptJson(blob, this._key);
+      // Normalise legacy snapshots that stored `containerId`
+      if (snapshot && Array.isArray(snapshot.tabs)) {
+        for (const t of snapshot.tabs) {
+          if (!t.container && t.containerId) t.container = t.containerId;
+        }
+      }
+      return snapshot;
     } catch {
       return null;
     }

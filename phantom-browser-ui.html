@@ -536,6 +536,11 @@ body.fullscreen .toolbar { padding-left: 8px; }
 }
 /* New Tab Page: "Blank" — dashboard chrome without content */
 body.blank-start .dash-center { display: none; }
+.dash-logo {
+  width: 72px; height: 72px;
+  user-select: none; -webkit-user-drag: none;
+  filter: drop-shadow(0 4px 14px rgba(0,0,0,0.35));
+}
 .dash-profile {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 600; color: var(--text-2);
@@ -1057,6 +1062,7 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
       <!-- DASHBOARD (shown when no tab is browsing) -->
       <div class="dashboard" id="dashboard">
         <div class="dash-center">
+          <img class="dash-logo" src="src/assets/ram-logo.svg" alt="Ram Browser" draggable="false">
           <div class="dash-profile">
             <span class="pp-dot" id="dashProfileDot"></span>
             <span id="dashProfileKicker">Personal</span>
@@ -1579,12 +1585,12 @@ body.ghost-mode .toolbar { border-bottom-color: rgba(255,69,58,0.30); }
         <div class="settings-heading">About</div>
         <div class="settings-subheading">Ram Browser — privacy-first Electron browser.</div>
 
-        <div class="s-about-logo">🔒</div>
+        <div class="s-about-logo"><img src="src/assets/ram-logo.svg" alt="Ram Browser" style="width:48px;height:48px" draggable="false"></div>
         <div class="s-version">Ram Browser · v0.1.0 · Electron 41 · Chromium</div>
 
         <div class="s-stat-grid">
-          <div class="s-stat"><div class="s-stat-num">100</div><div class="s-stat-lbl">Unit Tests</div></div>
-          <div class="s-stat"><div class="s-stat-num">18</div><div class="s-stat-lbl">E2E Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">105</div><div class="s-stat-lbl">Unit Tests</div></div>
+          <div class="s-stat"><div class="s-stat-num">22</div><div class="s-stat-lbl">E2E Tests</div></div>
           <div class="s-stat"><div class="s-stat-num">116</div><div class="s-stat-lbl">Features</div></div>
         </div>
 

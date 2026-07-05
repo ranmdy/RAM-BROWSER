@@ -52,13 +52,12 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  icon: build/icon.ico
+  # PNG ≥256px — electron-builder converts to .ico at build time
+  icon: build/icons/icon.png
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: build/icon.ico
-  uninstallerIcon: build/icon.ico
   license: build/license.txt
 
 # ── Linux ─────────────────────────────────────────────────────────────────────

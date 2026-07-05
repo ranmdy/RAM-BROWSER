@@ -106,27 +106,32 @@ function isContentProtectionEnabled() {
 }
 
 /**
- * Capture the current window frame as a base64 PNG data URL.
+ * Capture a window frame as a base64 PNG data URL.
  * Content protection is temporarily disabled during capture, then re-enabled.
  * Redaction (URL bar, tab titles, etc.) is applied in the renderer.
+ * @param {import('electron').BrowserWindow} [targetWin]  Window to capture
+ *        (defaults to the primary window this module is attached to)
  * @returns {Promise<string|null>}
  */
-async function captureWindowFrame() {
-  if (!_window || _window.isDestroyed()) return null;
+async function captureWindowFrame(targetWin) {
+  const win = targetWin || _window;
+  if (!win || win.isDestroyed()) return null;
 
-  // Temporarily disable content protection so we can capture
+  // Temporarily disable content protection on the target so we can capture
   const wasProtected = _contentProtectionEnabled;
-  if (wasProtected) applyContentProtection(false);
+  if (wasProtected) {
+    try { win.setContentProtection(false); } catch {}
+  }
 
   try {
-    const [width, height] = _window.getSize();
+    const [width, height] = win.getSize();
     const sources = await desktopCapturer.getSources({
       types: ['window'],
       thumbnailSize: { width, height }
     });
 
     // Find our window by title
-    const winTitle = _window.getTitle();
+    const winTitle = win.getTitle();
     const source = sources.find((s) => s.name === winTitle || s.name.includes('Ram Browser'))
       || sources.find((s) => s.id.includes('window'));
 
@@ -135,7 +140,9 @@ async function captureWindowFrame() {
   } catch {
     return null;
   } finally {
-    if (wasProtected) applyContentProtection(true);
+    if (wasProtected) {
+      try { win.setContentProtection(true); } catch {}
+    }
   }
 }
 

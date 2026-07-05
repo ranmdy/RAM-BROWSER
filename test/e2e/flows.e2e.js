@@ -219,6 +219,57 @@ test('theme=light and startPage=blank apply body classes via applyLiveSettings',
   expect(await window.evaluate(() => document.body.classList.contains('blank-start'))).toBe(false);
 });
 
+// ── PIN lock overlay ─────────────────────────────────────────────────────────
+// Runs LAST-ish: gives the active (scratch) profile a PIN. Regression for the
+// hardcoded 6-dot overlay that made 4-digit PINs impossible to submit.
+
+test('lock overlay shows one dot per PIN digit and unlocks with a 4-digit PIN', async () => {
+  // pin:set rejects out-of-range PINs (a 7-digit PIN could never be re-entered)
+  const rejected = await window.evaluate(async () => {
+    const active = await window.phantom.profiles.active();
+    return window.phantom.pin.set(active.uuid, '1234567');
+  });
+  expect(rejected.ok).toBe(false);
+
+  // Set a real 4-digit PIN and refresh renderer profile state
+  const setOk = await window.evaluate(async () => {
+    const active = await window.phantom.profiles.active();
+    const r = await window.phantom.pin.set(active.uuid, '2468');
+    await loadProfiles(); // top-level classic-script fn → global
+    return r;
+  });
+  expect(setOk.ok).toBe(true);
+
+  // Lock via the real "Lock Now" menu item
+  const clicked = await electronApp.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu();
+    if (!menu) return false;
+    const findItem = (items) => {
+      for (const item of items) {
+        if (item.label === 'Lock Now') return item;
+        if (item.submenu) {
+          const found = findItem(item.submenu.items);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const item = findItem(menu.items);
+    if (!item) return false;
+    item.click();
+    return true;
+  });
+  expect(clicked).toBe(true);
+
+  await expect(window.locator('#pinOverlay')).toBeVisible({ timeout: 5000 });
+  // 4-digit PIN → exactly 4 dot slots, not 6
+  await expect(window.locator('.pdot')).toHaveCount(4);
+
+  // Typing the 4 digits auto-submits and unlocks (argon2 verify can be slow)
+  await window.keyboard.type('2468');
+  await expect(window.locator('#pinOverlay')).toBeHidden({ timeout: 15000 });
+});
+
 // ── Settings persistence ─────────────────────────────────────────────────────
 
 test('settings persist to localStorage under ram:settings', async () => {

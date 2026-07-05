@@ -1702,8 +1702,8 @@ ipcMain.on('app:notify', (_e, { title, body }) => {
 // Profiles
 ipcMain.handle('profiles:list', async () => {
   const profiles = await profileManager.listProfiles();
-  return profiles.map(({ uuid, name, color, hidden, hasPin, hasDecoy, createdAt }) => ({
-    uuid, name, color, hidden, hasPin, hasDecoy, createdAt
+  return profiles.map(({ uuid, name, color, hidden, hasPin, hasDecoy, pinLength, createdAt }) => ({
+    uuid, name, color, hidden, hasPin, hasDecoy, pinLength, createdAt
   }));
 });
 
@@ -1744,7 +1744,9 @@ ipcMain.handle('profiles:switch', async (_e, { uuid, pin }) => {
     profile: result.profile ? {
       uuid: result.profile.uuid,
       name: result.profile.name,
-      color: result.profile.color
+      color: result.profile.color,
+      hasPin: Boolean(result.profile.hasPin),
+      pinLength: result.profile.pinLength || null
     } : null
   };
   } finally {
@@ -1758,7 +1760,13 @@ ipcMain.handle('profiles:active', async (e) => {
   if (ws?.profile) return { ...ws.profile };
   const profile = await profileManager.getActiveProfile();
   if (!profile) return null;
-  return { uuid: profile.uuid, name: profile.name, color: profile.color };
+  return {
+    uuid: profile.uuid,
+    name: profile.name,
+    color: profile.color,
+    hasPin: Boolean(profile.hasPin),
+    pinLength: profile.pinLength || null
+  };
 });
 
 ipcMain.handle('profiles:update', async (_e, { uuid, updates }) => {
@@ -1835,10 +1843,25 @@ ipcMain.handle('profiles:delete', async (_e, uuid) => {
 // PIN
 ipcMain.handle('pin:verify', async (_e, { uuid, pin }) => {
   const dir = profileManager.profileDir(uuid);
-  return verifyPin(dir, pin);
+  const result = await verifyPin(dir, pin);
+  // Self-heal profiles created before pinLength was recorded so the PIN
+  // overlay renders the right number of dots. Never store the decoy length —
+  // the decoy must stay indistinguishable from the real PIN.
+  if (result === 'valid') {
+    try {
+      const profile = await profileManager.getProfile(uuid);
+      if (profile && profile.pinLength !== String(pin).length) {
+        await profileManager.updateProfile(uuid, { pinLength: String(pin).length });
+      }
+    } catch {}
+  }
+  return result;
 });
 
 ipcMain.handle('pin:set', async (_e, { uuid, pin }) => {
+  // The overlay renders 4–6 dot slots — a PIN outside that range could never
+  // be entered again, permanently locking the profile.
+  if (!/^\d{4,6}$/.test(String(pin))) return { ok: false, error: 'PIN must be 4–6 digits' };
   const dir = profileManager.profileDir(uuid);
   const profile = await profileManager.getProfile(uuid);
   if (!profile) return { ok: false, error: 'Profile not found' };
@@ -1863,7 +1886,14 @@ ipcMain.handle('pin:set', async (_e, { uuid, pin }) => {
   if (prefs && Object.keys(prefs).length) {
     await profileManager.writePrefs(uuid, prefs, newKey);
   }
-  await profileManager.updateProfile(uuid, { hasPin: true, keySafe: null, keyBase64: null });
+  await profileManager.updateProfile(uuid, {
+    hasPin: true,
+    // Dot count for the PIN overlay. Length (4–6) is weak metadata; the
+    // overlay would reveal it on unlock anyway.
+    pinLength: String(pin).length,
+    keySafe: null,
+    keyBase64: null
+  });
 
   // Re-encrypt the existing tab snapshot under the PIN-derived key so
   // post-wipe tab restore keeps working. rekey() clears the snapshot if the
@@ -1889,6 +1919,15 @@ ipcMain.handle('pin:set', async (_e, { uuid, pin }) => {
 });
 
 ipcMain.handle('pin:set-decoy', async (_e, { uuid, pin }) => {
+  if (!/^\d{4,6}$/.test(String(pin))) return { ok: false, error: 'PIN must be 4–6 digits' };
+  // The decoy must be the same length as the real PIN: the overlay
+  // auto-submits at the real PIN's length, and a length difference would be
+  // observable (breaking deniability) or make the decoy un-enterable.
+  const profile = await profileManager.getProfile(uuid);
+  if (!profile) return { ok: false, error: 'Profile not found' };
+  if (profile.pinLength && String(pin).length !== profile.pinLength) {
+    return { ok: false, error: `Decoy PIN must match your real PIN length (${profile.pinLength} digits)` };
+  }
   const dir = profileManager.profileDir(uuid);
   await setDecoyPin(dir, pin);
   await profileManager.updateProfile(uuid, { hasDecoy: true });

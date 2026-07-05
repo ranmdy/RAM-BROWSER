@@ -1879,7 +1879,7 @@ function renderProfileList(profiles, activeUuid) {
     const nameSpan = document.createElement('span'); nameSpan.style.flex = '1'; nameSpan.textContent = p.name;
     const metaSpan = document.createElement('span'); metaSpan.className = 'pop-meta'; metaSpan.textContent = p.hasPin ? 'PIN' : '';
     item.append(colorDot, nameSpan, metaSpan);
-    item.addEventListener('click', (e) => { e.stopPropagation(); handleProfileSwitch(p.uuid, p.hasPin); });
+    item.addEventListener('click', (e) => { e.stopPropagation(); handleProfileSwitch(p.uuid, p.hasPin, p.pinLength); });
     list.appendChild(item);
   }
 }
@@ -1896,13 +1896,12 @@ function updateActiveProfileChip(profile) {
   $$('.profile-option').forEach((el) => el.classList.toggle('selected', el.dataset.profileUuid === profile.uuid));
 }
 
-async function handleProfileSwitch(uuid, hasPin) {
+async function handleProfileSwitch(uuid, hasPin, pinLength) {
   closeAllPopovers();
   if (hasPin) {
     profilePendingUuid = uuid;
     lockScreenMode = false;
-    pinBuffer = '';
-    updatePinDots();
+    preparePinOverlay(pinLength);
     $('#pinOverlay').classList.add('show');
     return;
   }
@@ -1947,7 +1946,7 @@ $('#npCreateBtn').addEventListener('click', async () => {
   const hidden = $('#npHidden').checked;
   const phrase = $('#npPhrase').value.trim();
   if (hidden && !phrase) { showToast('Enter an unlock phrase for the hidden profile.'); return; }
-  if (pin && (pin.length < 4 || !/^\d+$/.test(pin))) { showToast('PIN must be 4–6 digits.'); return; }
+  if (pin && !/^\d{4,6}$/.test(pin)) { showToast('PIN must be 4–6 digits.'); return; }
   try {
     const colors = ['#a78bfa','#30d158','#0a84ff','#ff453a','#ffd60a','#ff6b35'];
     const color = $('#npColor').value || colors[Math.floor(Math.random() * colors.length)];
@@ -2003,6 +2002,25 @@ function updatePinDots() {
   $$('.pdot').forEach((d, i) => d.classList.toggle('filled', i < pinBuffer.length));
 }
 
+// Render one dot slot per PIN digit (4–6). Legacy profiles without a stored
+// pinLength fall back to 6 slots + Enter-to-submit; the length self-heals in
+// the main process on the first successful unlock.
+let pinExpectedLength = 6;
+function preparePinOverlay(len) {
+  pinExpectedLength = (len >= 4 && len <= 6) ? len : 6;
+  const dots = $('.pin-dots');
+  if (dots && dots.children.length !== pinExpectedLength) {
+    dots.innerHTML = '';
+    for (let i = 0; i < pinExpectedLength; i++) {
+      const d = document.createElement('span');
+      d.className = 'pdot';
+      dots.appendChild(d);
+    }
+  }
+  pinBuffer = '';
+  updatePinDots();
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'F12') {
     const wv = activeTab()?.webview;
@@ -2011,10 +2029,13 @@ document.addEventListener('keydown', (e) => {
   }
   if (!$('#pinOverlay').classList.contains('show')) return;
   if (e.key >= '0' && e.key <= '9') {
-    if (pinBuffer.length >= 6) return;
+    if (pinBuffer.length >= pinExpectedLength) return;
     pinBuffer += e.key;
     updatePinDots();
-    if (pinBuffer.length === 6) submitPin();
+    if (pinBuffer.length === pinExpectedLength) submitPin();
+  } else if (e.key === 'Enter') {
+    // Fallback for legacy profiles showing 6 slots with a shorter PIN
+    if (pinBuffer.length >= 4) submitPin();
   } else if (e.key === 'Backspace') {
     pinBuffer = pinBuffer.slice(0, -1);
     updatePinDots();
@@ -2171,7 +2192,7 @@ function showFocusBlur() {
     if (s.autoLock !== false && lockSec > 0) {
       blurAutoLockTimer = setTimeout(() => {
         if ($('#focusBlurOverlay').classList.contains('show')) {
-          lockScreenMode = true; pinBuffer = ''; updatePinDots(); $('#pinOverlay').classList.add('show');
+          lockScreenMode = true; preparePinOverlay(currentProfile?.pinLength); $('#pinOverlay').classList.add('show');
         }
       }, lockSec * 1000);
     }
@@ -2193,7 +2214,7 @@ function hideAllTabViews() {
 function initSecurity() {
   if (!hasBridge) return;
   window.phantom.security.onLock(() => {
-    lockScreenMode = true; pinBuffer = ''; updatePinDots();
+    lockScreenMode = true; preparePinOverlay(currentProfile?.pinLength);
     hideAllTabViews();
     $('#focusBlurOverlay').classList.add('show');
     $('#pinOverlay').classList.add('show');
@@ -2582,7 +2603,7 @@ window.phantom?.menu?.onReload?.(() => { const t = activeTab(); if (t?.url) phan
 window.phantom?.menu?.onBack?.(() => { const t = activeTab(); if (t) phantom?.tabViews?.goBack?.(t.id); });
 window.phantom?.menu?.onForward?.(() => { const t = activeTab(); if (t) phantom?.tabViews?.goForward?.(t.id); });
 window.phantom?.menu?.onPanic?.(() => triggerPanic());
-window.phantom?.menu?.onLock?.(() => { lockScreenMode = true; $('#pinOverlay').classList.add('show'); });
+window.phantom?.menu?.onLock?.(() => { lockScreenMode = true; preparePinOverlay(currentProfile?.pinLength); $('#pinOverlay').classList.add('show'); });
 window.phantom?.menu?.onPrivacy?.(() => { const p = $('#privacyPanel'); if (p.classList.contains('open')) closeAllPopovers(); else openPopover(p); });
 window.phantom?.menu?.onScreenshot?.(() => takeScreenshot());
 window.phantom?.menu?.onSettings?.(() => openSettings());
@@ -3064,7 +3085,7 @@ function initSettings() {
     const cf  = $('#sPinConfirm')?.value;
     if (!nw) return showToast('Enter a new PIN.');
     if (nw !== cf)   return showToast('New PINs do not match.');
-    if (nw.length < 4) return showToast('PIN must be at least 4 digits.');
+    if (!/^\d{4,6}$/.test(nw)) return showToast('PIN must be 4–6 digits.');
     if (!hasBridge)  return showToast('Run npm start to save PIN.');
     try {
       // If profile already has a PIN, verify the current one first
@@ -3073,7 +3094,10 @@ function initSettings() {
         const v = await window.phantom.pin.verify(currentProfile?.uuid, cur);
         if (v !== 'valid') return showToast('Current PIN is incorrect.');
       }
-      await window.phantom.pin.set(currentProfile?.uuid, nw);
+      const r = await window.phantom.pin.set(currentProfile?.uuid, nw);
+      if (r && r.ok === false) return showToast(r.error || 'Could not set PIN.');
+      // Keep local state in sync so the lock overlay sizes correctly
+      if (currentProfile) { currentProfile.hasPin = true; currentProfile.pinLength = nw.length; }
       ['#sPinCurrent','#sPinNew','#sPinConfirm'].forEach((id) => { const el = $(id); if (el) el.value = ''; });
       showToast('PIN updated successfully.');
     } catch (err) { showToast(err.message); }
@@ -3086,12 +3110,16 @@ function initSettings() {
     const cf  = $('#sDecoyPinConfirm')?.value;
     if (!cur || !nw) return showToast('Enter current PIN and new decoy PIN.');
     if (nw !== cf)   return showToast('Decoy PINs do not match.');
-    if (nw.length < 4) return showToast('Decoy PIN must be at least 4 digits.');
+    if (!/^\d{4,6}$/.test(nw)) return showToast('Decoy PIN must be 4–6 digits.');
+    if (currentProfile?.pinLength && nw.length !== currentProfile.pinLength) {
+      return showToast(`Decoy PIN must match your real PIN length (${currentProfile.pinLength} digits).`);
+    }
     if (!hasBridge)  return showToast('Run npm start to save PIN.');
     try {
       const v = await window.phantom.pin.verify(currentProfile?.uuid, cur);
       if (v !== 'valid') return showToast('Current PIN is incorrect.');
-      await window.phantom.pin.setDecoy(currentProfile?.uuid, nw);
+      const r = await window.phantom.pin.setDecoy(currentProfile?.uuid, nw);
+      if (r && r.ok === false) return showToast(r.error || 'Could not set decoy PIN.');
       ['#sDecoyPinCurrent','#sDecoyPinNew','#sDecoyPinConfirm'].forEach((id) => { const el = $(id); if (el) el.value = ''; });
       showToast('Decoy PIN updated successfully.');
     } catch (err) { showToast(err.message); }
@@ -3259,8 +3287,7 @@ function initSettings() {
   // If the active profile has a PIN, require it on launch
   if (currentProfile?.hasPin) {
     lockScreenMode = true;
-    pinBuffer = '';
-    updatePinDots();
+    preparePinOverlay(currentProfile?.pinLength);
     $('#pinOverlay').classList.add('show');
   }
 
